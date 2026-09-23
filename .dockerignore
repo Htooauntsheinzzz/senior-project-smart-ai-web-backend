@@ -1,0 +1,10 @@
+.git
+.idea
+.env
+.env.*
+target
+spec-md
+Agent.md
+*.md
+keys/
+**/*.pem

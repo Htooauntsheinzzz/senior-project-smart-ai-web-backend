@@ -1,0 +1,2 @@
+-- Infrastructure baseline. Flyway creates and versions its schema history table.
+-- Domain tables will be introduced by subsequent module-specific migrations.

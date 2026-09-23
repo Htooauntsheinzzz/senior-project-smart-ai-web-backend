@@ -1,0 +1,118 @@
+name: smart-university
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine
+    environment:
+      REDIS_USERNAME: ${REDIS_USERNAME:?Set REDIS_USERNAME in .env}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
+      REDIS_DATABASE: ${REDIS_DATABASE:-0}
+    command:
+      - /bin/sh
+      - -ec
+      - >-
+        exec redis-server --appendonly yes --maxmemory-policy noeviction
+        --user default off
+        --user "$$REDIS_USERNAME" on ">$$REDIS_PASSWORD" '~*' '&*' '+@all'
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli --user \"$$REDIS_USERNAME\" -n \"$$REDIS_DATABASE\" ping | grep -qx PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+  admin-web:
+    build:
+      context: ../../frontend/smart-ai-admin-web
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend:
+    build: .
+    environment:
+      SERVER_PORT: 8080
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-default}
+      JWT_ISSUER: ${JWT_ISSUER:-smart-university-auth}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-smart-university-backend}
+      JWT_KEY_ID: ${JWT_KEY_ID:-auth-key-1}
+      JWT_ACCESS_TOKEN_TTL: ${JWT_ACCESS_TOKEN_TTL:-15m}
+      JWT_CLOCK_SKEW: ${JWT_CLOCK_SKEW:-30s}
+      AUTH_REDIS_KEY_PREFIX: ${AUTH_REDIS_KEY_PREFIX:-susa:dev:auth}
+      AUTH_REFRESH_TTL: ${AUTH_REFRESH_TTL:-7d}
+      AUTH_PASSWORD_CHANGE_TTL: ${AUTH_PASSWORD_CHANGE_TTL:-10m}
+      AUTH_MAX_ROTATIONS: ${AUTH_MAX_ROTATIONS:-2000}
+      BCRYPT_STRENGTH: ${BCRYPT_STRENGTH:-12}
+      AUTH_MAX_FAILED_ATTEMPTS: ${AUTH_MAX_FAILED_ATTEMPTS:-5}
+      AUTH_LOCK_DURATION: ${AUTH_LOCK_DURATION:-15m}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      REDIS_SSL_ENABLED: ${REDIS_SSL_ENABLED:-false}
+      REDIS_CONNECT_TIMEOUT: ${REDIS_CONNECT_TIMEOUT:-2s}
+      REDIS_COMMAND_TIMEOUT: ${REDIS_COMMAND_TIMEOUT:-2s}
+      AUTH_LOGIN_PER_IP: ${AUTH_LOGIN_PER_IP:-60}
+      AUTH_LOGIN_PER_IDENTIFIER: ${AUTH_LOGIN_PER_IDENTIFIER:-10}
+      AUTH_REFRESH_PER_IP: ${AUTH_REFRESH_PER_IP:-120}
+      JWT_PRIVATE_KEY_PATH: /app/keys/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/keys/public.pem
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_USERNAME: ${REDIS_USERNAME:?Set REDIS_USERNAME in .env}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
+      REDIS_DATABASE: ${REDIS_DATABASE:-0}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    volumes:
+      - type: bind
+        source: ${JWT_PRIVATE_KEY_PATH:?Set JWT_PRIVATE_KEY_PATH in .env}
+        target: /app/keys/private.pem
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${JWT_PUBLIC_KEY_PATH:?Set JWT_PUBLIC_KEY_PATH in .env}
+        target: /app/keys/public.pem
+        read_only: true
+        bind:
+          create_host_path: false
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:

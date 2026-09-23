@@ -1,0 +1,63 @@
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+### Local environment ###
+.env
+.env.*
+!.env.example
+
+### Local RSA keys ###
+/keys/
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+### Runtime logs and local exports ###
+*.log
+logs/
+*.hprof
+hs_err_pid*
+replay_pid*
+*.dump
+*.rdb
+*.aof
+*.postman_environment.json
+
+### OS metadata ###
+.DS_Store
+._*
+Thumbs.db
