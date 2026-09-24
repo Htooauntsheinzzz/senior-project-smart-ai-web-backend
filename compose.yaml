@@ -1,6 +1,25 @@
 name: smart-university
 
 services:
+  keygen:
+    image: alpine:3.22
+    profiles: [tools]
+    volumes:
+      - ./keys:/keys
+    entrypoint: /bin/sh
+    command:
+      - -ec
+      - |
+        if [ -e /keys/private.pem ] || [ -e /keys/public.pem ]; then
+          echo 'Keys already exist; refusing to overwrite them.'
+          exit 1
+        fi
+        apk add --no-cache openssl
+        umask 077
+        openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out /keys/private.pem
+        openssl pkey -in /keys/private.pem -pubout -out /keys/public.pem
+        chown 999:999 /keys/private.pem
+        chmod 644 /keys/public.pem
   postgres:
     image: postgres:17-alpine
     environment:
@@ -46,9 +65,16 @@ services:
 
   admin-web:
     build:
-      context: ../../frontend/smart-ai-admin-web
+      context: ${FRONTEND_PATH:-../../frontend/senior-project-smart-ai-admin-panel}
       args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/}
+    volumes:
+      - type: bind
+        source: ./docker/admin-web.conf
+        target: /etc/nginx/conf.d/default.conf
+        read_only: true
+        bind:
+          create_host_path: false
     ports:
       - "${FRONTEND_PORT:-3000}:80"
     depends_on:

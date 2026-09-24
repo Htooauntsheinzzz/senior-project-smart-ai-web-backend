@@ -13,6 +13,82 @@ specifications. Implementation decisions are recorded in
 
 ## Environment
 
+### First setup on Windows, macOS, or Linux
+
+Install Docker Desktop with Linux containers (Windows: enable the WSL2 backend),
+or Docker Engine with Compose v2 on Linux. Download **both** the backend and
+frontend repositories. Compose cannot build frontend source that is not present.
+The default layout is:
+
+```text
+SeniorProject/
+  backend/
+    senior-project-smart-ai-web-backend/  # Run Compose here
+      compose.yaml
+  frontend/
+    senior-project-smart-ai-admin-panel/
+      Dockerfile
+      package.json
+      package-lock.json
+```
+
+The backend folder name may differ. For any other frontend location, set
+`FRONTEND_PATH` in the backend `.env`. Paths are relative to `compose.yaml`,
+not to the terminal's previous directory. Windows absolute paths also work;
+use forward slashes and no surrounding quotes:
+
+```dotenv
+FRONTEND_PATH=C:/Users/User/OneDrive/Documents/SeniorProject/frontend/your-frontend-folder
+VITE_API_BASE_URL=/
+```
+
+In the backend directory, create your local environment file:
+
+```powershell
+# Windows PowerShell
+Copy-Item .env.example .env
+```
+
+```sh
+# macOS / Linux
+cp .env.example .env
+```
+
+Keep an existing `.env` rather than overwriting it. Fill in PostgreSQL and Redis
+passwords and check `FRONTEND_PATH`. Keep `VITE_API_BASE_URL=/` for the Compose
+stack: Nginx forwards `/api/` to `backend:8080`, so browsers on other devices
+do not mistakenly call their own localhost. Frontend-only Vite development can
+still use `http://localhost:8080` instead.
+
+Generate keys on a fresh device using Docker (no local OpenSSL needed):
+
+```sh
+docker compose run --rm keygen
+docker compose config --quiet
+docker compose up -d --build --wait
+docker compose ps
+```
+
+Key generation refuses to overwrite either existing key. It uses the default
+`./keys/private.pem` and `./keys/public.pem` paths and gives the private key to
+the backend container's UID 999. Existing custom key paths must still be
+provisioned separately. The first setup requires internet access for images,
+Maven/npm dependencies, and OpenSSL installation inside the key-generation container.
+
+Open `http://localhost:3000` for the frontend and `http://localhost:8080` for
+direct backend/Postman requests. From another device on the same network, use
+`http://<Docker-host-IP>:3000` and allow that port through the host firewall.
+If you change `FRONTEND_PORT`, the same-origin API proxy follows it automatically.
+
+For backend-only development when the frontend is not checked out:
+
+```sh
+docker compose up -d --build --wait postgres redis backend
+```
+
+`.gitattributes` preserves Linux line endings for container scripts, and the
+backend Docker build normalizes `mvnw` even for older Windows checkouts.
+
 The local `.env` file contains the PostgreSQL and Redis credentials specified in
 the setup specification. It is ignored by Git and excluded from Docker builds.
 For a fresh checkout, copy `.env.example` to `.env` and fill in the passwords.
