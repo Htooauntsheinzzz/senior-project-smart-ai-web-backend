@@ -44,6 +44,15 @@ public class SecurityConfig {
                             return new AuthorizationDecision(current.getAuthorities().stream()
                                     .anyMatch(authority -> authority.getAuthority().equals("ROLE_SUPER_ADMIN")));
                         })
+                        .requestMatchers("/api/v1/admin/faculties","/api/v1/admin/faculties/**",
+                                "/api/v1/admin/departments","/api/v1/admin/departments/**").access((auth,context) -> {
+                            var current=auth.get();
+                            restricted.requireFull(current);
+                            return new AuthorizationDecision(current.getAuthorities().stream().anyMatch(authority ->
+                                    authority.getAuthority().equals("ROLE_SUPER_ADMIN")
+                                    || authority.getAuthority().equals("ROLE_ADMIN")
+                                    || authority.getAuthority().equals("ROLE_ACADEMIC_ADMIN")));
+                        })
                         .anyRequest().access((auth,context) -> { restricted.requireFull(auth.get()); return new AuthorizationDecision(false); }))
                 .addFilterBefore(new AuthenticationRequestFilter(throttle,properties,errors,metrics),SecurityContextHolderFilter.class);
         return http.build();

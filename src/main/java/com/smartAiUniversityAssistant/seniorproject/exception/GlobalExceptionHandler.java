@@ -4,6 +4,7 @@ import com.smartAiUniversityAssistant.seniorproject.feature.authentication.excep
 import com.smartAiUniversityAssistant.seniorproject.feature.authentication.exception.AdminAccountProvisioningFailure;
 import com.smartAiUniversityAssistant.seniorproject.feature.authentication.exception.AdminAccountManagementFailure;
 import com.smartAiUniversityAssistant.seniorproject.feature.user.exception.AdminUserQueryValidationException;
+import com.smartAiUniversityAssistant.seniorproject.feature.faculty.exception.*;
 import com.smartAiUniversityAssistant.seniorproject.security.RestAccessDeniedHandler;
 import jakarta.servlet.http.*;
 import java.io.IOException;
@@ -19,6 +20,11 @@ import org.springframework.security.access.AccessDeniedException;
 public class GlobalExceptionHandler {
     private final ApiErrorWriter writer;
     public GlobalExceptionHandler(ApiErrorWriter writer) { this.writer=writer; }
+    @ExceptionHandler(com.smartAiUniversityAssistant.seniorproject.feature.department.exception.DepartmentFailure.class)
+    void department(com.smartAiUniversityAssistant.seniorproject.feature.department.exception.DepartmentFailure e,
+            HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,e.status(),e.code(),e.getMessage());
+    }
     @ExceptionHandler(AuthenticationFailure.class)
     void authentication(AuthenticationFailure e,HttpServletRequest req,HttpServletResponse res) throws IOException {
         writer.write(req,res,e.status(),e.code(),e.getMessage());
@@ -34,6 +40,22 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AdminUserQueryValidationException.class)
     void queryValidation(AdminUserQueryValidationException e,HttpServletRequest req,HttpServletResponse res) throws IOException {
         writer.write(req,res,400,"VALIDATION_ERROR","The request is invalid.");
+    }
+    @ExceptionHandler(FacultyQueryValidationException.class)
+    void facultyQueryValidation(FacultyQueryValidationException e,HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,400,"VALIDATION_ERROR","The request is invalid.");
+    }
+    @ExceptionHandler(FacultyNotFoundException.class)
+    void facultyNotFound(FacultyNotFoundException e,HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,404,"FACULTY_NOT_FOUND",e.getMessage());
+    }
+    @ExceptionHandler(FacultyCodeAlreadyExistsException.class)
+    void facultyCodeDuplicate(FacultyCodeAlreadyExistsException e,HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,409,"FACULTY_CODE_ALREADY_EXISTS",e.getMessage());
+    }
+    @ExceptionHandler(FacultyNameAlreadyExistsException.class)
+    void facultyNameDuplicate(FacultyNameAlreadyExistsException e,HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,409,"FACULTY_NAME_ALREADY_EXISTS",e.getMessage());
     }
     @ExceptionHandler({MethodArgumentNotValidException.class,HttpMessageNotReadableException.class,jakarta.validation.ConstraintViolationException.class,
             org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,

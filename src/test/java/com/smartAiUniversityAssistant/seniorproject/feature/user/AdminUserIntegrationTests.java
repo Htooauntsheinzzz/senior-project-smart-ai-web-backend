@@ -52,6 +52,9 @@ class AdminUserIntegrationTests extends IntegrationSupport {
         });
         db.update("DELETE FROM app_user_roles");
         db.update("DELETE FROM appuser_credentials");
+        db.update("UPDATE app_users SET department_id=NULL");
+        db.update("DELETE FROM departments");
+        db.update("DELETE FROM faculties");
         db.update("UPDATE app_users SET created_by=NULL,updated_by=NULL");
         db.update("DELETE FROM app_users");
         db.update("UPDATE app_roles SET is_active=TRUE");
@@ -116,11 +119,12 @@ class AdminUserIntegrationTests extends IntegrationSupport {
     @Test
     void explicitValuesPersistAndActiveUserCanLoginWithoutRestriction() throws Exception {
         String access = login("super@example.test", ACTOR_PASSWORD).get("accessToken").asText();
+        long departmentId = insertDepartment("DEPT-EXPL", "Explicit Department");
         Map<String, Object> request = validRequest(roleId("ACADEMIC_ADMIN"), "NEW-02", "normal@example.test");
-        request.put("departmentId", 999L);
+        request.put("departmentId", departmentId);
         request.put("forcePasswordChange", false);
         create(access, request).andExpect(status().isCreated())
-                .andExpect(jsonPath("departmentId").value(999))
+                .andExpect(jsonPath("departmentId").value(departmentId))
                 .andExpect(jsonPath("forcePasswordChange").value(false));
         assertThat(login("normal@example.test", TEMPORARY_PASSWORD).get("forcePasswordChange").asBoolean()).isFalse();
     }
@@ -225,6 +229,16 @@ class AdminUserIntegrationTests extends IntegrationSupport {
         assertThat(db.queryForObject("SELECT count(*) FROM app_user_roles WHERE user_id=?", Integer.class, id)).isOne();
     }
 
+    @Test
+    void missingDepartmentRejectsCreationWithoutPartialAccount() throws Exception {
+        String access = login("super@example.test", ACTOR_PASSWORD).get("accessToken").asText();
+        Map<String, Object> request = validRequest(roleId("ADMIN"), "DEPT-MISSING", "dept.missing@example.test");
+        request.put("departmentId", Long.MAX_VALUE);
+        create(access, request).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("code").value("DEPARTMENT_NOT_FOUND"));
+        assertThat(db.queryForObject("SELECT count(*) FROM app_users WHERE employee_id='DEPT-MISSING'", Integer.class)).isZero();
+    }
+
     private JsonNode login(String email, String password) throws Exception {
         MvcResult result = mvc.perform(post(LOGIN).contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsBytes(new LoginRequest(email, password))))
@@ -240,6 +254,17 @@ class AdminUserIntegrationTests extends IntegrationSupport {
 
     private long roleId(String code) {
         return db.queryForObject("SELECT id FROM app_roles WHERE role_code=?", Long.class, code);
+    }
+
+    private long insertDepartment(String code, String name) {
+        long facultyId = db.queryForObject("""
+                INSERT INTO faculties(faculty_code,faculty_name_en,is_active,is_deleted,created_by,created_at)
+                VALUES (?,?,TRUE,FALSE,?,CURRENT_TIMESTAMP) RETURNING id
+                """, Long.class, "FAC-" + code, "Faculty for " + name, actorId);
+        return db.queryForObject("""
+                INSERT INTO departments(department_code,department_name,faculty_id,is_active,is_deleted,created_by,created_at)
+                VALUES (?,?,?,TRUE,FALSE,?,CURRENT_TIMESTAMP) RETURNING id
+                """, Long.class, code, name, facultyId, actorId);
     }
 
     private Map<String, Object> validRequest(long roleId, String employeeId, String email) {

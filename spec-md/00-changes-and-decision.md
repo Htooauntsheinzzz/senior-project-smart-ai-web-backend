@@ -94,3 +94,39 @@
 ### D20 — List page size limit
 - **Conflict:** Specification 09 defines the list default page size as 20 with an allowed range of 1–100.
 - **Decision:** Per product request (2026-09-20), the list endpoint uses a page size limit of 50 per page: default `size=50`, allowed range 1–50, larger values rejected with `400`.
+
+## 2026-09-24 — Faculty Management (specifications 09-file `09-flyway-faculties.md` and 10-file `10-implement-crud-faculties.md`)
+
+### D21 — Faculty authorization roles
+- **Decision:** Follow specification 10's recommendation: `SUPER_ADMIN`, `ADMIN`, and `ACADEMIC_ADMIN` may use all Faculty endpoints, unlike the Super-Admin-only Admin User endpoints. Password-change-restricted callers still receive `403 PASSWORD_CHANGE_REQUIRED`; other unsupported roles receive `403 FORBIDDEN`.
+
+### D22 — No Redis caching for Faculty
+- **Conflict:** Specification 10 describes Redis caching only "if Redis cache management is enabled in the project".
+- **Decision:** The project has no cache infrastructure (`@EnableCaching`, cache manager, or cache namespace); Redis serves authentication sessions and throttling under a `noeviction` policy. Faculty reads query PostgreSQL directly, which remains the sole source of truth. Caching can be introduced later as an explicitly designed extension.
+
+### D24 — Development Super Admin seed preference
+- **Decision:** Per explicit user request, the development seed uses `force_password_change = FALSE`. This supersedes D13's forced-change value for the seeded account only. Existing accounts are not reset on startup, and changing migration metadata does not change stored credentials. Other accounts retain the existing forced-change policy. Any V7 checksum mismatch on an existing installation must be verified with Flyway before an explicitly authorized repair; do not guess or manually overwrite checksums.
+
+### D25 — Department referential integrity
+- **Decision:** V9 creates departments and V10 adds the nullable `app_users.department_id` foreign key. Non-null department IDs must now reference an existing department; this supersedes the earlier unverified-placeholder contract. Invalid existing references are not rewritten by the migrations. Create/update user operations translate this known FK failure to `400 DEPARTMENT_NOT_FOUND`. Test fixtures use actual departments and clear test-only user department references before teardown.
+
+### D23 — Faculty response, error, and uniqueness conventions
+- **Decision:** Keep the project's established conventions instead of the specification's illustrative `{"success","message","data"}` envelope and `error`-style examples: plain DTO bodies, existing `ApiError` shape, `VALIDATION_ERROR`, and codes `FACULTY_NOT_FOUND` (404), `FACULTY_CODE_ALREADY_EXISTS` (409), `FACULTY_NAME_ALREADY_EXISTS` (409). Timestamps emit ISO-8601 UTC with `Z`. Following the project's uniqueness policy, soft-deleted Faculties keep `faculty_code`/`faculty_name_en` reserved (database UNIQUE constraints cover deleted rows; friendly checks include them and races translate to `409`). Faculty delete is not idempotent: a missing or already deleted target returns `404`, per the specification's delete workflow. `departmentCount`/`studentCount`/`totalDepartments` return `0` until the Department feature exists.
+
+## 2026-09-24 — Department CRUD (`12-implement-department.md`)
+
+### D26 — Department contracts and Faculty selection
+- **Decision:** Keep plain DTO responses and the existing paginated shape. The specification mixes nested and flat Faculty response examples; use its section 52 flat `facultyId`, `facultyCode`, `facultyNameEn` fields consistently for create/detail/update and list items. All three administrative roles may use these routes. Default page size is 20, maximum 100; literal case-insensitive search, allowlisted sorting, and `id,asc` tie-breaking match Faculty conventions.
+- **Decision:** Codes are trimmed and match `^[A-Z0-9-]+$`. Names are trimmed and unique within the Faculty using exact-case database semantics, rather than the illustrative IgnoreCase repository example. Both unique constraints reserve values after soft deletion. Every create/update requires an active, non-deleted selected Faculty; missing/deleted returns `404 FACULTY_NOT_FOUND`, inactive returns `400 INVALID_FACULTY`.
+
+### D27 — Assignment-safe soft deletion
+- **Decision:** Interpret assigned users as all non-deleted users, including inactive/locked/suspended accounts; otherwise later activation would leave a live user attached to a deleted department. Deleted users do not block deletion and retain their historical department reference. Missing/already-deleted departments return `404`; assigned departments return `409 DEPARTMENT_IN_USE`; successful soft deletion returns `204`.
+- **Implementation:** Department deletion and application user-assignment writers share a pessimistic department row lock with a PostgreSQL lock timeout. User create/full-update operations reject missing or deleted department references with `400 DEPARTMENT_NOT_FOUND`. This closes the assignment-vs-delete race without clearing anyone's department ID. Direct SQL writes are outside this application-level soft-delete guarantee. Authentication owns the narrow assigned-user read service.
+
+### D28 — Live Faculty counts and conditional caching
+- **Decision:** Faculty `departmentCount` and summary `totalDepartments` now count non-deleted departments (including inactive ones). List counts are fetched in one batch; Department list uses a to-one Faculty entity graph. Multi-query lists/summaries use repeatable-read snapshots. Program/course/student counts remain zero because those features do not exist.
+- **Decision:** Continue D22: application caching is not enabled. The Department spec's conditional Redis caching does not require a new cache subsystem. PostgreSQL reads immediately reflect successful writes and Faculty moves; no cache eviction is necessary.
+
+### D29 — Fractional ID rejection
+- **Finding:** Disabling scalar coercion alone still allowed Jackson to truncate a floating-point JSON ID to an integer.
+- **Decision:** Disable `accept-float-as-int` globally to enforce the existing integer ID contract; fractional IDs now return `400 VALIDATION_ERROR`.

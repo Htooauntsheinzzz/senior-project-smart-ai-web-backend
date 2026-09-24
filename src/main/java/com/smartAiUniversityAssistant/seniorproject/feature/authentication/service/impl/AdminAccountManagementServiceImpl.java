@@ -4,6 +4,7 @@ import com.smartAiUniversityAssistant.seniorproject.feature.authentication.entit
 import com.smartAiUniversityAssistant.seniorproject.feature.authentication.exception.AdminAccountManagementFailure;
 import com.smartAiUniversityAssistant.seniorproject.feature.authentication.repository.*;
 import com.smartAiUniversityAssistant.seniorproject.feature.authentication.service.*;
+import com.smartAiUniversityAssistant.seniorproject.feature.department.service.DepartmentAssignmentService;
 import com.smartAiUniversityAssistant.seniorproject.security.*;
 import jakarta.persistence.criteria.*;
 import java.time.*;
@@ -26,10 +27,12 @@ public class AdminAccountManagementServiceImpl implements AdminAccountManagement
     private final CredentialPolicy credentialPolicy;
     private final PasswordPolicy passwordPolicy;
     private final Clock clock;
+    private final DepartmentAssignmentService departmentAssignments;
 
     public AdminAccountManagementServiceImpl(AppUserRepository users, AppRoleRepository roles,
             AppUserRoleRepository userRoles, AppUserCredentialsRepository credentials,
-            CredentialPolicy credentialPolicy, PasswordPolicy passwordPolicy, Clock clock) {
+            CredentialPolicy credentialPolicy, PasswordPolicy passwordPolicy, Clock clock,
+            DepartmentAssignmentService departmentAssignments) {
         this.users = users;
         this.roles = roles;
         this.userRoles = userRoles;
@@ -37,6 +40,7 @@ public class AdminAccountManagementServiceImpl implements AdminAccountManagement
         this.credentialPolicy = credentialPolicy;
         this.passwordPolicy = passwordPolicy;
         this.clock = clock;
+        this.departmentAssignments = departmentAssignments;
     }
 
     @Override
@@ -81,6 +85,7 @@ public class AdminAccountManagementServiceImpl implements AdminAccountManagement
                 && (!target.getAccountStatus().equals(command.accountStatus()) || assignmentChanged))
             throw selfChange();
         if (changed) {
+            departmentAssignments.requireExistingForAssignment(command.departmentId());
             target.setEmployeeId(command.employeeId());
             target.setFirstName(command.firstName());
             target.setLastName(command.lastName());
@@ -287,6 +292,8 @@ public class AdminAccountManagementServiceImpl implements AdminAccountManagement
             if (cause instanceof org.hibernate.exception.ConstraintViolationException violation) {
                 if ("uk_app_users_email".equals(violation.getConstraintName())) return duplicateEmail();
                 if ("uk_app_users_employee_id".equals(violation.getConstraintName())) return duplicateEmployee();
+                if ("fk_app_users_department".equals(violation.getConstraintName()))
+                    return failure(400, "DEPARTMENT_NOT_FOUND", "The selected department does not exist.");
                 break;
             }
             cause = cause.getCause();

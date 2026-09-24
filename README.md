@@ -167,8 +167,8 @@ are denied. Super Admins with full sessions manage administrative users at
 (`GET`), detail (`GET /{id}`), full update (`PUT /{id}`), status change
 (`PATCH /{id}/status`), role replacement (`PUT /{id}/role`), and soft delete
 (`DELETE /{id}`). Flyway migration V7 creates the initial development Super Admin,
-credential, and role assignment. The account must change its password before
-accessing business endpoints. Flyway records the migration, so subsequent startup
+credential, and role assignment. Fresh installations seed this development account
+with `force_password_change = FALSE`. Flyway records the migration, so subsequent startup
 does not duplicate or reset the account. The migration contains only a BCrypt hash,
 not the plaintext password.
 
@@ -203,8 +203,8 @@ forwarded client-IP headers.
 
 ## Create an administrative user
 
-The initial Super Admin must change its seeded password before it can use the
-create-user endpoint. In Postman, first call `POST /api/v1/admin/auth/login`:
+Fresh installations allow the initial Super Admin to use the create-user endpoint
+without a forced password change. In Postman, first call `POST /api/v1/admin/auth/login`:
 
 ```json
 {
@@ -213,7 +213,8 @@ create-user endpoint. In Postman, first call `POST /api/v1/admin/auth/login`:
 }
 ```
 
-Use the returned `accessToken` as a Bearer token for
+If an existing account returns `forcePasswordChange: true`, or you want to change
+your password, use the returned `accessToken` as a Bearer token for
 `POST /api/v1/admin/auth/change-password`:
 
 ```json
@@ -223,7 +224,7 @@ Use the returned `accessToken` as a Bearer token for
 }
 ```
 
-Log in again with the new password to obtain a full-session access token. Role
+After changing the password, log in again to obtain a full-session access token. Role
 IDs are database identifiers; list the available administrative roles with:
 
 ```sh
@@ -295,6 +296,114 @@ All routes below require a full-session Super Admin Bearer token and return
   (decision D18), so these operations rely on per-request database rechecks
   instead of bulk session revocation. A reactivated user's old sessions may work
   again until they expire.
+
+## Manage faculties
+
+Faculty endpoints live under `/api/v1/admin/faculties` and allow
+`SUPER_ADMIN`, `ADMIN`, and `ACADEMIC_ADMIN` full-session tokens.
+
+- **Create:** `POST /api/v1/admin/faculties`
+
+  ```json
+  {
+    "facultyCode": "FAC-ENG",
+    "facultyNameEn": "Faculty of Engineering",
+    "facultyNameTh": "คณะวิศวกรรมศาสตร์",
+    "isActive": true
+  }
+  ```
+
+  `facultyCode` must match `^[A-Z0-9-]+$` (max 30); names max 255; `isActive`
+  defaults to `true`; `facultyNameTh` is optional. Duplicate code or English
+  name returns `409 FACULTY_CODE_ALREADY_EXISTS` /
+  `FACULTY_NAME_ALREADY_EXISTS` (soft-deleted records stay reserved).
+  Expected: `201 Created` with the created faculty (`createdBy` comes from the
+  token, never the request body).
+- **List:** `GET /api/v1/admin/faculties` with optional `page` (default 0),
+  `size` (1–100, default 20), `search` (code/English/Thai names,
+  case-insensitive literal), `status` (`ACTIVE`/`INACTIVE`), and up to three
+  `sort` entries (`facultyCode`, `facultyNameEn`, `facultyNameTh`, `isActive`,
+  `createdAt`, `updatedAt`, `id`; default `createdAt,desc` + `id,asc`).
+  Soft-deleted records are excluded.
+- **Detail:** `GET /api/v1/admin/faculties/{id}` → `200` or
+  `404 FACULTY_NOT_FOUND` for missing/deleted records.
+- **Update:** `PUT /api/v1/admin/faculties/{id}` with all four editable fields
+  (`facultyCode`, `facultyNameEn`, `facultyNameTh`, `isActive`). Also used to
+  activate/deactivate (`"isActive": false`).
+- **Delete:** `DELETE /api/v1/admin/faculties/{id}` soft-deletes and returns
+  `204`; repeating returns `404`.
+- **Summary:** `GET /api/v1/admin/faculties/summary` returns
+  `totalFaculties`, `activeFaculties`, `inactiveFaculties`, and
+  `totalDepartments` (the number of non-deleted departments).
+
+Faculty icons are frontend presentation only and are never stored or returned
+by the backend. Faculty `departmentCount` is calculated from non-deleted
+departments, including inactive departments. `studentCount` remains `0`.
+
+## Manage departments
+
+All six endpoints require a full-session Bearer token with `SUPER_ADMIN`,
+`ADMIN`, or `ACADEMIC_ADMIN`. Responses are plain DTOs, with no `data` envelope.
+
+| Method | Path | Success |
+| --- | --- | --- |
+| POST | `/api/v1/admin/departments` | 201 |
+| GET | `/api/v1/admin/departments` | 200, paginated |
+| GET | `/api/v1/admin/departments/{id}` | 200 |
+| PUT | `/api/v1/admin/departments/{id}` | 200 |
+| DELETE | `/api/v1/admin/departments/{id}` | 204, empty body |
+| GET | `/api/v1/admin/departments/summary` | 200 |
+
+Create an active Faculty first, then use its actual returned ID in `facultyId`:
+
+```json
+{
+  "departmentCode": "DEPT-CE",
+  "departmentName": "Computer Engineering",
+  "facultyId": 1,
+  "isActive": true
+}
+```
+
+POST defaults omitted `isActive` to `true`. PUT requires all four fields and
+can move the department to another active Faculty. Code must use uppercase
+letters/digits/hyphens (maximum 30 characters); name maximum 255 characters.
+Audit fields are server-controlled. IDs must be positive integers; strings
+and fractional numbers are rejected.
+
+Examples for Postman (Bearer authorization, no GET body):
+
+```text
+GET /api/v1/admin/departments?page=0&size=20
+GET /api/v1/admin/departments?search=engineering&facultyId=1&status=ACTIVE
+GET /api/v1/admin/departments?sort=departmentName,asc
+GET /api/v1/admin/departments/summary
+```
+
+Pagination defaults to page 0 / size 20, with size 1–100. Sort supports
+`id`, `departmentCode`, `departmentName`, and `createdAt`; default
+`createdAt,desc` plus `id,asc`. Search matches code/name as a literal
+case-insensitive substring. Unknown filter IDs yield empty lists. Deleted
+departments are excluded from lists, detail, and summaries.
+
+Responses include flat `facultyId`, `facultyCode`, and `facultyNameEn` fields.
+`programCount`, `courseCount`, and `studentCount` are currently zero. Summary
+returns `totalDepartments`, `activeDepartments`, and `inactiveDepartments`.
+Faculty counts update after Department creation, moves, and deletion.
+
+Errors use the shared `ApiError` shape:
+- `400 VALIDATION_ERROR`: invalid JSON, fields, IDs, or query parameters.
+- `404 FACULTY_NOT_FOUND`: requested Faculty is missing/deleted.
+- `400 INVALID_FACULTY`: requested Faculty is inactive.
+- `409 DEPARTMENT_CODE_ALREADY_EXISTS`: code is reserved, including deleted records.
+- `409 DEPARTMENT_NAME_ALREADY_EXISTS`: name is reserved within the selected Faculty.
+- `404 DEPARTMENT_NOT_FOUND`: department is missing/deleted, including repeated DELETE.
+- `409 DEPARTMENT_IN_USE`: any non-deleted user is assigned, including inactive users.
+
+Deletion never clears user assignments. Assignments from deleted users remain
+historical references and do not block soft deletion. New user assignments to
+deleted departments are rejected. Faculty/Department reads query PostgreSQL
+directly; application Redis caching is not currently enabled (D22/D28).
 
 ## Run the backend locally
 

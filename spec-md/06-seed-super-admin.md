@@ -30,7 +30,7 @@ Account Status:
 ACTIVE
 
 Force Password Change:
-TRUE
+FALSE
 
 Department:
 NULL

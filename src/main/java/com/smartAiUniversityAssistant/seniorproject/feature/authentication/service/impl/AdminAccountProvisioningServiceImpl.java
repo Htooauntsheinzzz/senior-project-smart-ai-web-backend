@@ -4,6 +4,7 @@ import com.smartAiUniversityAssistant.seniorproject.feature.authentication.entit
 import com.smartAiUniversityAssistant.seniorproject.feature.authentication.exception.AdminAccountProvisioningFailure;
 import com.smartAiUniversityAssistant.seniorproject.feature.authentication.repository.*;
 import com.smartAiUniversityAssistant.seniorproject.feature.authentication.service.*;
+import com.smartAiUniversityAssistant.seniorproject.feature.department.service.DepartmentAssignmentService;
 import com.smartAiUniversityAssistant.seniorproject.security.*;
 import java.time.*;
 import java.util.Set;
@@ -25,11 +26,12 @@ public class AdminAccountProvisioningServiceImpl implements AdminAccountProvisio
     private final PasswordPolicy passwordPolicy;
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
+    private final DepartmentAssignmentService departmentAssignments;
 
     public AdminAccountProvisioningServiceImpl(AppUserRepository users, AppRoleRepository roles,
             AppUserRoleRepository userRoles, AppUserCredentialsRepository credentials,
             CredentialPolicy credentialPolicy, PasswordPolicy passwordPolicy,
-            PasswordEncoder passwordEncoder, Clock clock) {
+            PasswordEncoder passwordEncoder, Clock clock, DepartmentAssignmentService departmentAssignments) {
         this.users = users;
         this.roles = roles;
         this.userRoles = userRoles;
@@ -38,6 +40,7 @@ public class AdminAccountProvisioningServiceImpl implements AdminAccountProvisio
         this.passwordPolicy = passwordPolicy;
         this.passwordEncoder = passwordEncoder;
         this.clock = clock;
+        this.departmentAssignments = departmentAssignments;
     }
 
     @Override
@@ -73,6 +76,7 @@ public class AdminAccountProvisioningServiceImpl implements AdminAccountProvisio
         if (emailExists) throw duplicateEmail();
         if (employeeExists) throw duplicateEmployee();
 
+        departmentAssignments.requireExistingForAssignment(command.departmentId());
         String hash = passwordEncoder.encode(command.temporaryPassword());
         try {
             var user = new AppUser();
@@ -119,6 +123,8 @@ public class AdminAccountProvisioningServiceImpl implements AdminAccountProvisio
             if (cause instanceof org.hibernate.exception.ConstraintViolationException violation) {
                 if ("uk_app_users_email".equals(violation.getConstraintName())) return duplicateEmail();
                 if ("uk_app_users_employee_id".equals(violation.getConstraintName())) return duplicateEmployee();
+                if ("fk_app_users_department".equals(violation.getConstraintName()))
+                    return failure(400, "DEPARTMENT_NOT_FOUND", "The selected department does not exist.");
                 break;
             }
             cause = cause.getCause();

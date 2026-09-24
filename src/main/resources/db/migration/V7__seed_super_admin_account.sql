@@ -48,7 +48,7 @@ INSERT INTO appuser_credentials (
 SELECT
     id,
     '$2a$12$kyhAjias0zJ4ZClCiCkgiOj0BXAI9djZvlvIlpjLt6MmDIIsXSoNG',
-    TRUE,
+    FALSE,
     0,
     CURRENT_TIMESTAMP
 FROM app_users

@@ -55,6 +55,9 @@ class AdminUserCrudIntegrationTests extends IntegrationSupport {
         });
         db.update("DELETE FROM app_user_roles");
         db.update("DELETE FROM appuser_credentials");
+        db.update("UPDATE app_users SET department_id=NULL");
+        db.update("DELETE FROM departments");
+        db.update("DELETE FROM faculties");
         db.update("UPDATE app_users SET created_by=NULL,updated_by=NULL");
         db.update("DELETE FROM app_users");
         db.update("UPDATE app_roles SET is_active=TRUE");
@@ -146,9 +149,11 @@ class AdminUserCrudIntegrationTests extends IntegrationSupport {
     @Test
     void listSearchIsLiteralCaseInsensitiveAndFiltersCombine() throws Exception {
         long admin = roleId("ADMIN");
-        long one = insertUser("SRCH-01", "Mali", "One", "mali.s@example.test", "ACTIVE", 5L, "2026-01-01 01:00:00");
+        long deptA = insertDepartment("DEPT-A", "Department Alpha");
+        long deptB = insertDepartment("DEPT-B", "Department Beta");
+        long one = insertUser("SRCH-01", "Mali", "One", "mali.s@example.test", "ACTIVE", deptA, "2026-01-01 01:00:00");
         long two = insertUser("SRCH-02", "Malik", "Two", "special%user@example.test", "INACTIVE", null, "2026-01-01 02:00:00");
-        insertUser("SRCH-03", "Noi", "Three", "noi@example.test", "LOCKED", 7L, "2026-01-01 03:00:00");
+        insertUser("SRCH-03", "Noi", "Three", "noi@example.test", "LOCKED", deptB, "2026-01-01 03:00:00");
         assign(one, "ADMIN");
         assign(two, "SUPER_ADMIN");
 
@@ -167,7 +172,7 @@ class AdminUserCrudIntegrationTests extends IntegrationSupport {
                 .andExpect(status().isOk()).andExpect(jsonPath("totalElements").value(1));
         mvc.perform(get(USERS).param("roleId", String.valueOf(admin)).header("Authorization", "Bearer " + access))
                 .andExpect(status().isOk()).andExpect(jsonPath("totalElements").value(1));
-        mvc.perform(get(USERS).param("departmentId", "7").header("Authorization", "Bearer " + access))
+        mvc.perform(get(USERS).param("departmentId", String.valueOf(deptB)).header("Authorization", "Bearer " + access))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("totalElements").value(1))
                 .andExpect(jsonPath("content[0].employeeId").value("SRCH-03"));
@@ -223,16 +228,17 @@ class AdminUserCrudIntegrationTests extends IntegrationSupport {
         addCredentials(target, TARGET_PASSWORD, false);
         assign(target, "ADMIN");
 
+        long departmentId = insertDepartment("DEPT-UPD", "Department Update");
         Map<String, Object> request = updateRequest(roleId("SUPER_ADMIN"), "UPD-02", "after@example.test");
         request.put("firstName", "  After  ");
         request.put("lastName", "Changed");
         request.put("phoneNumber", "  +66 91 111 2222  ");
-        request.put("departmentId", 7L);
+        request.put("departmentId", departmentId);
         putJson(USERS + "/" + target, request).andExpect(status().isOk())
                 .andExpect(jsonPath("employeeId").value("UPD-02"))
                 .andExpect(jsonPath("firstName").value("After"))
                 .andExpect(jsonPath("phoneNumber").value("+66 91 111 2222"))
-                .andExpect(jsonPath("departmentId").value(7))
+                .andExpect(jsonPath("departmentId").value(departmentId))
                 .andExpect(jsonPath("roles[0].roleCode").value("SUPER_ADMIN"))
                 .andExpect(jsonPath("updatedBy").value(actorId))
                 .andExpect(jsonPath("updatedAt").value(clock.instant().toString()))
@@ -551,6 +557,22 @@ class AdminUserCrudIntegrationTests extends IntegrationSupport {
         assertThat(redis.keys("susa:test:auth:session:*")).hasSameSizeAs(before);
     }
 
+    @Test
+    void missingDepartmentRollsBackProfileAndRoleUpdate() throws Exception {
+        long target = insertUser("DEPT-ROLLBACK", "Original", "User", "dept.rollback@example.test",
+                "ACTIVE", null, "2026-01-01 01:00:00");
+        assign(target, "ADMIN");
+        var request = updateRequest(roleId("ACADEMIC_ADMIN"), "DEPT-ROLLBACK", "dept.changed@example.test");
+        request.put("departmentId", Long.MAX_VALUE);
+        putJson(USERS + "/" + target, request).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("code").value("DEPARTMENT_NOT_FOUND"));
+        assertThat(db.queryForObject("SELECT email FROM app_users WHERE id=?", String.class, target))
+                .isEqualTo("dept.rollback@example.test");
+        assertThat(db.queryForObject("SELECT updated_at FROM app_users WHERE id=?", Timestamp.class, target)).isNull();
+        assertThat(db.queryForList("SELECT role_id FROM app_user_roles WHERE user_id=?", Long.class, target))
+                .containsExactly(roleId("ADMIN"));
+    }
+
     private JsonNode login(String email, String password) throws Exception {
         MvcResult result = mvc.perform(post(LOGIN).contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsBytes(new LoginRequest(email, password))))
@@ -578,6 +600,17 @@ class AdminUserCrudIntegrationTests extends IntegrationSupport {
 
     private long roleId(String code) {
         return db.queryForObject("SELECT id FROM app_roles WHERE role_code=?", Long.class, code);
+    }
+
+    private long insertDepartment(String code, String name) {
+        long facultyId = db.queryForObject("""
+                INSERT INTO faculties(faculty_code,faculty_name_en,is_active,is_deleted,created_by,created_at)
+                VALUES (?,?,TRUE,FALSE,?,CURRENT_TIMESTAMP) RETURNING id
+                """, Long.class, "FAC-" + code, "Faculty for " + name, actorId);
+        return db.queryForObject("""
+                INSERT INTO departments(department_code,department_name,faculty_id,is_active,is_deleted,created_by,created_at)
+                VALUES (?,?,?,TRUE,FALSE,?,CURRENT_TIMESTAMP) RETURNING id
+                """, Long.class, code, name, facultyId, actorId);
     }
 
     private long insertUser(String employeeId, String firstName, String lastName, String email,

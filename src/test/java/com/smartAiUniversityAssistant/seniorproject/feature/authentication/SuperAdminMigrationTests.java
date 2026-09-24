@@ -21,7 +21,7 @@ class SuperAdminMigrationTests extends IntegrationSupport {
                 .cleanDisabled(false)
                 .load();
         try {
-            assertThat(flyway.migrate().migrationsExecuted).isEqualTo(7);
+            assertThat(flyway.migrate().migrationsExecuted).isEqualTo(10);
             var dataSource = new DriverManagerDataSource(
                     POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
             var db = new JdbcTemplate(dataSource);
@@ -43,7 +43,7 @@ class SuperAdminMigrationTests extends IntegrationSupport {
                     .containsEntry("email", "smartairsu@rsu.ac.th")
                     .containsEntry("account_status", "ACTIVE")
                     .containsEntry("is_deleted", false)
-                    .containsEntry("force_password_change", true)
+                    .containsEntry("force_password_change", false)
                     .containsEntry("failed_login_attempts", 0)
                     .containsEntry("role_code", "SUPER_ADMIN");
             assertThat(account.get("department_id")).isNull();
