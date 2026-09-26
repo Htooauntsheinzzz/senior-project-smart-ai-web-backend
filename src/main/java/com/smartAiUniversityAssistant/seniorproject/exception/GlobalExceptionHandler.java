@@ -25,6 +25,11 @@ public class GlobalExceptionHandler {
             HttpServletRequest req,HttpServletResponse res) throws IOException {
         writer.write(req,res,e.status(),e.code(),e.getMessage());
     }
+    @ExceptionHandler(com.smartAiUniversityAssistant.seniorproject.feature.program.exception.ProgramFailure.class)
+    void program(com.smartAiUniversityAssistant.seniorproject.feature.program.exception.ProgramFailure e,
+            HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,e.status(),e.code(),e.getMessage());
+    }
     @ExceptionHandler(AuthenticationFailure.class)
     void authentication(AuthenticationFailure e,HttpServletRequest req,HttpServletResponse res) throws IOException {
         writer.write(req,res,e.status(),e.code(),e.getMessage());

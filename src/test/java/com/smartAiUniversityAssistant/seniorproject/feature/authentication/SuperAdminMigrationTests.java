@@ -21,7 +21,7 @@ class SuperAdminMigrationTests extends IntegrationSupport {
                 .cleanDisabled(false)
                 .load();
         try {
-            assertThat(flyway.migrate().migrationsExecuted).isEqualTo(10);
+            assertThat(flyway.migrate().migrationsExecuted).isEqualTo(11);
             var dataSource = new DriverManagerDataSource(
                     POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
             var db = new JdbcTemplate(dataSource);

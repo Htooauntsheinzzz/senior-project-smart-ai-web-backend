@@ -130,3 +130,13 @@
 ### D29 — Fractional ID rejection
 - **Finding:** Disabling scalar coercion alone still allowed Jackson to truncate a floating-point JSON ID to an integer.
 - **Decision:** Disable `accept-float-as-int` globally to enforce the existing integer ID contract; fractional IDs now return `400 VALIDATION_ERROR`.
+
+## 2026-09-26 — Programs & Majors CRUD (`14-implementation-crud-programs&majors.md`)
+
+### D30 — Free-text degree level across the Program feature
+- **Decision:** Store and expose `degreeLevel` as a trimmed, nonblank JSON/Java `String` (maximum 100) without an enum, list, or lookup. Degree filtering compares the full string case-insensitively; uniqueness follows the database's exact-case `(department_id, program_name, degree_level)` constraint. Reject numeric/array JSON values rather than coercing them to Strings. `facultyId` is used only to validate the Department's current Faculty; it is not persisted in `programs`.
+
+### D31 — Program API, uniqueness and related counts
+- **Decision:** Use existing plain DTOs, standard pagination shape (default 20, max 100), allowlisted sorting and `id,asc` tie-breaker, with flat Faculty/Department identifiers, codes and names instead of illustrative nested/enveloped response examples. Authorize `SUPER_ADMIN`, `ADMIN`, and `ACADEMIC_ADMIN` full sessions. Match current Faculty/Department conventions: codes and scoped name/degree triples are reserved after soft deletion; known database uniqueness races map to `409 PROGRAM_CODE_ALREADY_EXISTS` or `409 PROGRAM_ALREADY_EXISTS`. Missing/deleted targets and repeated DELETE yield `404 PROGRAM_NOT_FOUND`. Inactive or mismatched Departments yield `400 INVALID_PROGRAM_DEPARTMENT`.
+- **Decision:** Department `programCount` now derives from non-deleted Programs, including inactive ones, using a single grouped query per page. Course and student counts remain zero. Keep program read paths in PostgreSQL: caching remains conditional because this project has no application cache manager or cache namespace (D22/D28). No additional migrations or degree lookup tables are introduced.
+- **Decision:** With Programs implemented, Department soft deletion also rejects any non-deleted Program (including inactive ones) with `409 DEPARTMENT_HAS_PROGRAMS`. Program create and reassignment lock the Department row before locking its Faculty, matching Department mutation lock order and serializing against deletion; deleted Programs do not block later Department deletion.

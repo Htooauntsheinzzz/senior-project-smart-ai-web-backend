@@ -7,6 +7,7 @@ import com.smartAiUniversityAssistant.seniorproject.feature.department.exception
 import com.smartAiUniversityAssistant.seniorproject.feature.department.mapper.DepartmentMapper;
 import com.smartAiUniversityAssistant.seniorproject.feature.department.repository.DepartmentRepository;
 import com.smartAiUniversityAssistant.seniorproject.feature.department.service.DepartmentService;
+import com.smartAiUniversityAssistant.seniorproject.feature.department.service.DepartmentStatisticsService;
 import com.smartAiUniversityAssistant.seniorproject.feature.faculty.entity.Faculty;
 import com.smartAiUniversityAssistant.seniorproject.feature.faculty.exception.FacultyNotFoundException;
 import com.smartAiUniversityAssistant.seniorproject.feature.faculty.repository.FacultyRepository;
@@ -30,15 +31,18 @@ public class DepartmentServiceImpl implements DepartmentService {
     private final DepartmentMapper mapper;
     private final Clock clock;
     private final EntityManager entityManager;
+    private final DepartmentStatisticsService departmentStatistics;
 
     public DepartmentServiceImpl(DepartmentRepository departments, FacultyRepository faculties,
-            DepartmentUserAssignments assignments, DepartmentMapper mapper, Clock clock, EntityManager entityManager) {
+            DepartmentUserAssignments assignments, DepartmentMapper mapper, Clock clock, EntityManager entityManager,
+            DepartmentStatisticsService departmentStatistics) {
         this.departments = departments;
         this.faculties = faculties;
         this.assignments = assignments;
         this.mapper = mapper;
         this.clock = clock;
         this.entityManager = entityManager;
+        this.departmentStatistics = departmentStatistics;
     }
 
     @Override @Transactional(timeout = 15)
@@ -56,7 +60,7 @@ public class DepartmentServiceImpl implements DepartmentService {
         department.setCreatedBy(actor.userId());
         department.setCreatedAt(now());
         try {
-            return mapper.response(departments.saveAndFlush(department));
+            return mapper.response(departments.saveAndFlush(department), 0);
         } catch (DataIntegrityViolationException e) {
             throw translate(e);
         }
@@ -65,14 +69,16 @@ public class DepartmentServiceImpl implements DepartmentService {
     @Override @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ, timeout = 15)
     public DepartmentPageResponse list(AuthenticatedUser actor, DepartmentListQuery query) {
         requireFull(actor);
-        return mapper.page(departments.findAll(specification(query), query.pageable()), query);
+        var page = departments.findAll(specification(query), query.pageable());
+        var programCounts = departmentStatistics.programCountsByDepartment(page.getContent().stream().map(Department::getId).toList());
+        return mapper.page(page, query, programCounts);
     }
 
     @Override @Transactional(readOnly = true, timeout = 15)
     public DepartmentResponse detail(AuthenticatedUser actor, long id) {
         requireFull(actor);
         positiveId(id);
-        return mapper.response(departments.findByIdAndDeletedFalse(id).orElseThrow(DepartmentNotFoundException::new));
+        return response(departments.findByIdAndDeletedFalse(id).orElseThrow(DepartmentNotFoundException::new));
     }
 
     @Override @Transactional(timeout = 15)
@@ -94,7 +100,7 @@ public class DepartmentServiceImpl implements DepartmentService {
         } catch (DataIntegrityViolationException e) {
             throw translate(e);
         }
-        return mapper.response(department);
+        return response(department);
     }
 
     @Override @Transactional(timeout = 15)
@@ -104,6 +110,7 @@ public class DepartmentServiceImpl implements DepartmentService {
         lockTimeout();
         Department department = locked(id);
         if (assignments.hasNonDeletedUsers(id)) throw new DepartmentInUseException();
+        if (departmentStatistics.hasNonDeletedPrograms(id)) throw new DepartmentHasProgramsException();
         department.setDeleted(true);
         department.setUpdatedBy(actor.userId());
         department.setUpdatedAt(now());
@@ -116,6 +123,12 @@ public class DepartmentServiceImpl implements DepartmentService {
         long total = departments.countByDeletedFalse();
         long active = departments.countByActiveTrueAndDeletedFalse();
         return new DepartmentSummaryResponse(total, active, total - active);
+    }
+
+    private DepartmentResponse response(Department department) {
+        long count = departmentStatistics.programCountsByDepartment(List.of(department.getId()))
+                .getOrDefault(department.getId(), 0L);
+        return mapper.response(department, count);
     }
 
     private Department locked(long id) {

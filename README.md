@@ -387,7 +387,8 @@ case-insensitive substring. Unknown filter IDs yield empty lists. Deleted
 departments are excluded from lists, detail, and summaries.
 
 Responses include flat `facultyId`, `facultyCode`, and `facultyNameEn` fields.
-`programCount`, `courseCount`, and `studentCount` are currently zero. Summary
+`programCount` counts non-deleted programs, including inactive programs;
+`courseCount` and `studentCount` remain zero. Summary
 returns `totalDepartments`, `activeDepartments`, and `inactiveDepartments`.
 Faculty counts update after Department creation, moves, and deletion.
 
@@ -399,11 +400,73 @@ Errors use the shared `ApiError` shape:
 - `409 DEPARTMENT_NAME_ALREADY_EXISTS`: name is reserved within the selected Faculty.
 - `404 DEPARTMENT_NOT_FOUND`: department is missing/deleted, including repeated DELETE.
 - `409 DEPARTMENT_IN_USE`: any non-deleted user is assigned, including inactive users.
+- `409 DEPARTMENT_HAS_PROGRAMS`: non-deleted Programs still belong to the Department.
 
 Deletion never clears user assignments. Assignments from deleted users remain
 historical references and do not block soft deletion. New user assignments to
 deleted departments are rejected. Faculty/Department reads query PostgreSQL
 directly; application Redis caching is not currently enabled (D22/D28).
+
+## Manage programs and majors
+
+The six `/api/v1/admin/programs` endpoints require a full-session Bearer token
+with `SUPER_ADMIN`, `ADMIN`, or `ACADEMIC_ADMIN` authority. Create an active
+Faculty and an active Department under it first; use their actual IDs:
+
+| Method | Path | Success |
+| --- | --- | --- |
+| POST | `/api/v1/admin/programs` | 201 |
+| GET | `/api/v1/admin/programs` | 200, paginated |
+| GET | `/api/v1/admin/programs/{id}` | 200 |
+| PUT | `/api/v1/admin/programs/{id}` | 200 |
+| DELETE | `/api/v1/admin/programs/{id}` | 204, empty body |
+| GET | `/api/v1/admin/programs/summary` | 200 |
+
+Create request (PUT requires the same required fields and `isActive`):
+
+```json
+{
+  "programCode": "PRG-CE-BS",
+  "programName": "Computer Engineering",
+  "degreeLevel": "Bachelor of Engineering",
+  "facultyId": 1,
+  "departmentId": 3,
+  "durationYears": 4,
+  "totalCredits": 144,
+  "isActive": true
+}
+```
+
+**`degreeLevel` is free-text JSON String**, entered in a text box. It is
+trimmed, required, and limited to 100 characters; arbitrary nonblank degree
+names are supported. No enum, dropdown/list, or degree lookup table is used.
+`programCode` is trimmed, uppercase letters/digits/hyphens, maximum 50;
+`programName` is trimmed, maximum 255. `durationYears` and `totalCredits` are
+optional positive integers. POST defaults missing `isActive` to `true`.
+`facultyId` validates that the selected active, non-deleted Department belongs
+to the selected active, non-deleted Faculty; only `departmentId` is stored in
+`programs`. Audit fields are derived from the token, never accepted in JSON.
+
+The list supports `page=0&size=20` (default page 0 / size 20, max size 100),
+`search` (literal case-insensitive code/name substring), `facultyId`,
+`departmentId`, `degreeLevel` (exact, case-insensitive String match), `status`
+(`ACTIVE`/`INACTIVE`), and repeatable `sort=field,direction` (max three).
+Sort fields: `id`, `programCode`, `programName`, `degreeLevel`, `durationYears`,
+`totalCredits`, `createdAt`; default `createdAt,desc` then `id,asc`.
+
+Responses use the existing plain DTO/page format, with flat Faculty/Department
+names/codes, `degreeLevel` as a String, and UTC audit timestamps. The summary
+returns `totalPrograms`, `activePrograms`, and `inactivePrograms`. A Department's
+`programCount` now counts its non-deleted programs. Deletes are soft; repeating
+DELETE or requesting a deleted Program returns `404 PROGRAM_NOT_FOUND`. The
+database reserves codes and (Department, name, degree level) triples after
+soft deletion. Known errors include `400 INVALID_PROGRAM_DEPARTMENT` for an
+inactive or mismatched Department, `404 FACULTY_NOT_FOUND` /
+`DEPARTMENT_NOT_FOUND`, and `409 PROGRAM_CODE_ALREADY_EXISTS` /
+`PROGRAM_ALREADY_EXISTS`. Redis application caching remains disabled; PostgreSQL
+is the source of truth. A Department cannot be soft-deleted while it contains
+non-deleted Programs (including inactive Programs); move or delete those Programs
+first.
 
 ## Run the backend locally
 

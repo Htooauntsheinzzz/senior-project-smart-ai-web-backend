@@ -21,18 +21,19 @@ public class AuthenticationRequestFilter extends OncePerRequestFilter {
         boolean usersPath=path.equals("/api/v1/admin/users") || path.startsWith("/api/v1/admin/users/");
         boolean facultiesPath=path.equals("/api/v1/admin/faculties") || path.startsWith("/api/v1/admin/faculties/");
         boolean departmentsPath=path.equals("/api/v1/admin/departments") || path.startsWith("/api/v1/admin/departments/");
+        boolean programsPath=path.equals("/api/v1/admin/programs") || path.startsWith("/api/v1/admin/programs/");
         boolean createUser=path.equals("/api/v1/admin/users") && request.getMethod().equals("POST");
         boolean mutationMethod=request.getMethod().equals("POST") || request.getMethod().equals("PUT") || request.getMethod().equals("PATCH");
-        boolean adminMutation=(usersPath || facultiesPath || departmentsPath) && mutationMethod;
+        boolean adminMutation=(usersPath || facultiesPath || departmentsPath || programsPath) && mutationMethod;
         long start=System.nanoTime();
         try {
-            if (authPath || usersPath || facultiesPath || departmentsPath) response.setHeader("Cache-Control","no-store");
+            if (authPath || usersPath || facultiesPath || departmentsPath || programsPath) response.setHeader("Cache-Control","no-store");
             if (request.getMethod().equals("POST") && (path.equals("/api/v1/admin/auth/login") || path.equals("/api/v1/admin/auth/refresh") || path.equals("/api/v1/admin/auth/change-password")) || adminMutation) {
                 if (path.equals("/api/v1/admin/auth/login")) throttle.check("login-ip",request.getRemoteAddr(),properties.throttle().loginPerIp());
                 if (path.equals("/api/v1/admin/auth/refresh")) throttle.check("refresh-ip",request.getRemoteAddr(),properties.throttle().refreshPerIp());
                 if (createUser) throttle.check("provision-ip",request.getRemoteAddr(),properties.throttle().loginPerIp());
                 byte[] bytes=request.getInputStream().readNBytes(16385);
-                if ((usersPath || facultiesPath || departmentsPath) && bytes.length>16384) throw new AuthenticationFailure(413,"CONTENT_TOO_LARGE","The request body is too large.");
+                if ((usersPath || facultiesPath || departmentsPath || programsPath) && bytes.length>16384) throw new AuthenticationFailure(413,"CONTENT_TOO_LARGE","The request body is too large.");
                 var input=new ByteArrayInputStream(bytes);
                 request=new HttpServletRequestWrapper(request) {
                     @Override public ServletInputStream getInputStream() {
@@ -51,7 +52,7 @@ public class AuthenticationRequestFilter extends OncePerRequestFilter {
         catch (AuthenticationInfrastructureException | org.springframework.dao.DataAccessException | org.springframework.transaction.TransactionException e) {
             errors.write(request,response,503,"AUTH_SERVICE_UNAVAILABLE","Authentication service temporarily unavailable.");
         } finally {
-            if (authPath || usersPath || facultiesPath || departmentsPath) {
+            if (authPath || usersPath || facultiesPath || departmentsPath || programsPath) {
                 String operation=java.util.Set.of("/api/v1/admin/auth/login","/api/v1/admin/auth/refresh","/api/v1/admin/auth/logout","/api/v1/admin/auth/me","/api/v1/admin/auth/change-password").contains(path)?path:"other";
                 metrics.timer("auth.http", "operation",operation,"status",Integer.toString(response.getStatus()))
                         .record(System.nanoTime()-start,java.util.concurrent.TimeUnit.NANOSECONDS);

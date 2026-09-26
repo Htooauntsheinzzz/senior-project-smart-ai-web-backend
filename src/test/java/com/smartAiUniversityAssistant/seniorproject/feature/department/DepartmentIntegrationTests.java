@@ -51,6 +51,7 @@ class DepartmentIntegrationTests extends IntegrationSupport {
             return null;
         });
         db.update("UPDATE app_users SET department_id=NULL,created_by=NULL,updated_by=NULL");
+        db.update("DELETE FROM programs");
         db.update("DELETE FROM departments");
         db.update("DELETE FROM faculties");
         db.update("DELETE FROM app_user_roles");

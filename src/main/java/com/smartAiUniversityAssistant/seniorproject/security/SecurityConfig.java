@@ -45,7 +45,8 @@ public class SecurityConfig {
                                     .anyMatch(authority -> authority.getAuthority().equals("ROLE_SUPER_ADMIN")));
                         })
                         .requestMatchers("/api/v1/admin/faculties","/api/v1/admin/faculties/**",
-                                "/api/v1/admin/departments","/api/v1/admin/departments/**").access((auth,context) -> {
+                                "/api/v1/admin/departments","/api/v1/admin/departments/**",
+                                "/api/v1/admin/programs","/api/v1/admin/programs/**").access((auth,context) -> {
                             var current=auth.get();
                             restricted.requireFull(current);
                             return new AuthorizationDecision(current.getAuthorities().stream().anyMatch(authority ->
