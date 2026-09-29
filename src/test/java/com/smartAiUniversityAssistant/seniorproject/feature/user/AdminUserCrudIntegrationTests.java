@@ -56,6 +56,8 @@ class AdminUserCrudIntegrationTests extends IntegrationSupport {
         db.update("DELETE FROM app_user_roles");
         db.update("DELETE FROM appuser_credentials");
         db.update("UPDATE app_users SET department_id=NULL");
+        db.update("DELETE FROM lectures");
+        db.update("DELETE FROM semesters");
         db.update("DELETE FROM programs");
         db.update("DELETE FROM departments");
         db.update("DELETE FROM faculties");

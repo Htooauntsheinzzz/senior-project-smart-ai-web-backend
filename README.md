@@ -468,6 +468,39 @@ is the source of truth. A Department cannot be soft-deleted while it contains
 non-deleted Programs (including inactive Programs); move or delete those Programs
 first.
 
+## Manage semesters
+
+The five `/api/v1/admin/semesters` endpoints require a full-session Bearer token
+with `SUPER_ADMIN`, `ADMIN`, or `ACADEMIC_ADMIN` authority:
+
+| Method | Path | Success |
+| --- | --- | --- |
+| POST | `/api/v1/admin/semesters` | 201 |
+| GET | `/api/v1/admin/semesters` | 200, paginated |
+| GET | `/api/v1/admin/semesters/{id}` | 200 |
+| PUT | `/api/v1/admin/semesters/{id}` | 200 |
+| DELETE | `/api/v1/admin/semesters/{id}` | 204, empty body |
+
+Create and update bodies (both fields are required, trimmed, max 150):
+
+```json
+{
+  "semesterNameTh": "ภาคการศึกษาที่ 1",
+  "semesterNameEn": "Semester 1"
+}
+```
+
+The list supports `page=0&size=20` (max size 100), `search` (literal
+case-insensitive match across both Thai and English names), and repeatable
+`sort=field,direction` entries (max three). Sort fields: `id`, `semesterNameTh`,
+`semesterNameEn`, `createdAt`, `updatedAt`; default `createdAt,desc` then
+`id,asc`. There is intentionally **no** `isActive`, status filter, or summary
+endpoint. The Thai/English pair is unique and stays reserved after soft
+deletion: duplicates return `409 SEMESTER_ALREADY_EXISTS`; missing or deleted
+records (including repeated DELETE) return `404 SEMESTER_NOT_FOUND`. Responses
+are plain DTOs with UTC audit timestamps, and audit IDs always come from the
+token.
+
 ## Run the backend locally
 
 ```sh

@@ -47,6 +47,8 @@ class AuthenticationIntegrationTests extends IntegrationSupport {
         redis.execute((org.springframework.data.redis.core.RedisCallback<Void>) c -> { c.serverCommands().flushDb(); return null; });
          db.update("DELETE FROM app_user_roles"); db.update("DELETE FROM appuser_credentials");
          db.update("UPDATE app_users SET department_id=NULL");
+         db.update("DELETE FROM lectures");
+         db.update("DELETE FROM semesters");
          db.update("DELETE FROM programs");
          db.update("DELETE FROM departments");
          db.update("DELETE FROM faculties");
@@ -342,7 +344,7 @@ class AuthenticationIntegrationTests extends IntegrationSupport {
     @Test void migrationHistoryAndSchemaStayValid() {
         assertThat(db.queryForList("SELECT checksum FROM flyway_schema_history WHERE version IN ('1','2','3','4','5','6') ORDER BY installed_rank",Integer.class))
                 .containsExactly(-1609524967,-715303110,750119622,111998084,-1083275929,347487127);
-        assertThat(db.queryForObject("SELECT count(*) FROM flyway_schema_history",Integer.class)).isEqualTo(11);
+        assertThat(db.queryForObject("SELECT count(*) FROM flyway_schema_history",Integer.class)).isEqualTo(13);
         assertThat(db.queryForObject("SELECT description FROM flyway_schema_history WHERE version='7'",String.class))
                 .isEqualTo("seed super admin account");
         assertThat(db.queryForObject("SELECT description FROM flyway_schema_history WHERE version='8'",String.class))
@@ -353,7 +355,11 @@ class AuthenticationIntegrationTests extends IntegrationSupport {
                 .isEqualTo("add app users department foreign key");
         assertThat(db.queryForObject("SELECT description FROM flyway_schema_history WHERE version='11'",String.class))
                 .isEqualTo("create programs");
-        assertThat(db.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_schema='public'",Integer.class)).isEqualTo(8);
+        assertThat(db.queryForObject("SELECT description FROM flyway_schema_history WHERE version='12'",String.class))
+                .isEqualTo("create semesters");
+        assertThat(db.queryForObject("SELECT description FROM flyway_schema_history WHERE version='13'",String.class))
+                .isEqualTo("create lectures");
+        assertThat(db.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_schema='public'",Integer.class)).isEqualTo(10);
         assertThat(db.queryForObject("SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('app_roles','app_users','app_user_roles','appuser_credentials')",Integer.class)).isEqualTo(34);
     }
 }
