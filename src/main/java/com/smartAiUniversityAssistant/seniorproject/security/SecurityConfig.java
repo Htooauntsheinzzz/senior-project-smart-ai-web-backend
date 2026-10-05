@@ -48,7 +48,9 @@ public class SecurityConfig {
                                 "/api/v1/admin/departments","/api/v1/admin/departments/**",
                                 "/api/v1/admin/programs","/api/v1/admin/programs/**",
                                 "/api/v1/admin/semesters","/api/v1/admin/semesters/**",
-                                "/api/v1/admin/lectures","/api/v1/admin/lectures/**").access((auth,context) -> {
+                                "/api/v1/admin/lectures","/api/v1/admin/lectures/**",
+                                "/api/v1/admin/courses","/api/v1/admin/courses/**",
+                                "/api/v1/admin/course-sections","/api/v1/admin/course-sections/**").access((auth,context) -> {
                             var current=auth.get();
                             restricted.requireFull(current);
                             return new AuthorizationDecision(current.getAuthorities().stream().anyMatch(authority ->
