@@ -12,6 +12,7 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long>, JpaSpec
     Optional<AppUser> findByIdAndDeletedFalse(Long id);
     boolean existsByEmail(String email);
     boolean existsByEmployeeId(String employeeId);
+    boolean existsByDepartmentIdAndDeletedFalse(Long departmentId);
     boolean existsByEmailAndIdNot(String email, Long id);
     boolean existsByEmployeeIdAndIdNot(String employeeId, Long id);
     @Lock(LockModeType.PESSIMISTIC_WRITE)

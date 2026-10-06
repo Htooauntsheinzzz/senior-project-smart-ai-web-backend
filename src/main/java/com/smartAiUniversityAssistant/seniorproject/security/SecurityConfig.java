@@ -35,21 +35,57 @@ public class SecurityConfig {
                         .jwt(j -> j.jwtAuthenticationConverter(converter)))
                 .authorizeHttpRequests(c -> c
                         .requestMatchers(HttpMethod.POST,"/api/v1/admin/auth/login","/api/v1/admin/auth/refresh").permitAll()
+                        .requestMatchers(HttpMethod.POST,STUDENT_PUBLIC).permitAll()
                         .requestMatchers(HttpMethod.GET,"/actuator/health/liveness","/actuator/health/readiness").permitAll()
-                        .requestMatchers(HttpMethod.GET,"/api/v1/admin/auth/me").authenticated()
-                        .requestMatchers(HttpMethod.POST,"/api/v1/admin/auth/logout","/api/v1/admin/auth/change-password").authenticated()
+                        .requestMatchers(HttpMethod.GET,"/api/v1/admin/auth/me").access((auth,context) -> admin(auth.get()))
+                        .requestMatchers(HttpMethod.POST,"/api/v1/admin/auth/logout","/api/v1/admin/auth/change-password")
+                                .access((auth,context) -> admin(auth.get()))
+                        // A student who must change their password may still read /me, change it, and sign out.
+                        .requestMatchers(HttpMethod.GET,"/api/v1/student/auth/me").access((auth,context) -> student(auth.get()))
+                        .requestMatchers(HttpMethod.POST,"/api/v1/student/auth/logout","/api/v1/student/auth/change-password")
+                                .access((auth,context) -> student(auth.get()))
+                        .requestMatchers("/api/v1/student/**").access((auth,context) -> {
+                            var current=auth.get();
+                            if (current!=null && current.getPrincipal() instanceof AuthenticatedStudent s && s.forcePasswordChange())
+                                throw new PasswordChangeRequiredException();
+                            return student(current);
+                        })
                         .requestMatchers("/api/v1/admin/users","/api/v1/admin/users/**").access((auth,context) -> {
                             var current=auth.get();
                             restricted.requireFull(current);
                             return new AuthorizationDecision(current.getAuthorities().stream()
                                     .anyMatch(authority -> authority.getAuthority().equals("ROLE_SUPER_ADMIN")));
                         })
+                        .requestMatchers("/api/v1/admin/faculties","/api/v1/admin/faculties/**",
+                                "/api/v1/admin/departments","/api/v1/admin/departments/**",
+                                "/api/v1/admin/programs","/api/v1/admin/programs/**",
+                                "/api/v1/admin/semesters","/api/v1/admin/semesters/**",
+                                "/api/v1/admin/lectures","/api/v1/admin/lectures/**",
+                                "/api/v1/admin/courses","/api/v1/admin/courses/**",
+                                "/api/v1/admin/course-sections","/api/v1/admin/course-sections/**",
+                                "/api/v1/admin/students","/api/v1/admin/students/**").access((auth,context) -> {
+                            var current=auth.get();
+                            restricted.requireFull(current);
+                            return new AuthorizationDecision(current.getAuthorities().stream().anyMatch(authority ->
+                                    authority.getAuthority().equals("ROLE_SUPER_ADMIN")
+                                    || authority.getAuthority().equals("ROLE_ADMIN")
+                                    || authority.getAuthority().equals("ROLE_ACADEMIC_ADMIN")));
+                        })
                         .anyRequest().access((auth,context) -> { restricted.requireFull(auth.get()); return new AuthorizationDecision(false); }))
                 .addFilterBefore(new AuthenticationRequestFilter(throttle,properties,errors,metrics),SecurityContextHolderFilter.class);
         return http.build();
     }
+    private static final String[] STUDENT_PUBLIC={"/api/v1/student/auth/register","/api/v1/student/auth/login","/api/v1/student/auth/refresh"};
     private boolean isPublic(String method,String path) {
-        return method.equals("POST") && (path.equals("/api/v1/admin/auth/login") || path.equals("/api/v1/admin/auth/refresh"));
+        return method.equals("POST") && (path.equals("/api/v1/admin/auth/login") || path.equals("/api/v1/admin/auth/refresh")
+                || java.util.Arrays.asList(STUDENT_PUBLIC).contains(path));
+    }
+    private static AuthorizationDecision admin(org.springframework.security.core.Authentication auth) {
+        return new AuthorizationDecision(auth!=null && auth.isAuthenticated() && auth.getPrincipal() instanceof AuthenticatedUser);
+    }
+    private static AuthorizationDecision student(org.springframework.security.core.Authentication auth) {
+        return new AuthorizationDecision(auth!=null && auth.isAuthenticated() && auth.getPrincipal() instanceof AuthenticatedStudent
+                && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_STUDENT")));
     }
     private CorsConfigurationSource cors(AuthenticationProperties properties) {
         var c=new CorsConfiguration(); c.setAllowedOrigins(properties.cors().allowedOrigins());

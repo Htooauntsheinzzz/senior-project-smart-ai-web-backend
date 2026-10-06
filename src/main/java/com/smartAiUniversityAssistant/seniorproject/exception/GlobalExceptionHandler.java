@@ -4,6 +4,7 @@ import com.smartAiUniversityAssistant.seniorproject.feature.authentication.excep
 import com.smartAiUniversityAssistant.seniorproject.feature.authentication.exception.AdminAccountProvisioningFailure;
 import com.smartAiUniversityAssistant.seniorproject.feature.authentication.exception.AdminAccountManagementFailure;
 import com.smartAiUniversityAssistant.seniorproject.feature.user.exception.AdminUserQueryValidationException;
+import com.smartAiUniversityAssistant.seniorproject.feature.faculty.exception.*;
 import com.smartAiUniversityAssistant.seniorproject.security.RestAccessDeniedHandler;
 import jakarta.servlet.http.*;
 import java.io.IOException;
@@ -19,6 +20,41 @@ import org.springframework.security.access.AccessDeniedException;
 public class GlobalExceptionHandler {
     private final ApiErrorWriter writer;
     public GlobalExceptionHandler(ApiErrorWriter writer) { this.writer=writer; }
+    @ExceptionHandler(com.smartAiUniversityAssistant.seniorproject.feature.department.exception.DepartmentFailure.class)
+    void department(com.smartAiUniversityAssistant.seniorproject.feature.department.exception.DepartmentFailure e,
+            HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,e.status(),e.code(),e.getMessage());
+    }
+    @ExceptionHandler(com.smartAiUniversityAssistant.seniorproject.feature.program.exception.ProgramFailure.class)
+    void program(com.smartAiUniversityAssistant.seniorproject.feature.program.exception.ProgramFailure e,
+            HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,e.status(),e.code(),e.getMessage());
+    }
+    @ExceptionHandler(com.smartAiUniversityAssistant.seniorproject.feature.lecture.exception.LectureFailure.class)
+    void lecture(com.smartAiUniversityAssistant.seniorproject.feature.lecture.exception.LectureFailure e,
+            HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,e.status(),e.code(),e.getMessage());
+    }
+    @ExceptionHandler(com.smartAiUniversityAssistant.seniorproject.feature.semester.exception.SemesterFailure.class)
+    void semester(com.smartAiUniversityAssistant.seniorproject.feature.semester.exception.SemesterFailure e,
+            HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,e.status(),e.code(),e.getMessage());
+    }
+    @ExceptionHandler(com.smartAiUniversityAssistant.seniorproject.feature.coursesection.exception.CourseSectionFailure.class)
+    void courseSection(com.smartAiUniversityAssistant.seniorproject.feature.coursesection.exception.CourseSectionFailure e,
+            HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,e.status(),e.code(),e.getMessage());
+    }
+    @ExceptionHandler(com.smartAiUniversityAssistant.seniorproject.feature.course.exception.CourseFailure.class)
+    void course(com.smartAiUniversityAssistant.seniorproject.feature.course.exception.CourseFailure e,
+            HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,e.status(),e.code(),e.getMessage());
+    }
+    @ExceptionHandler(com.smartAiUniversityAssistant.seniorproject.feature.student.exception.StudentFailure.class)
+    void student(com.smartAiUniversityAssistant.seniorproject.feature.student.exception.StudentFailure e,
+            HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,e.status(),e.code(),e.getMessage());
+    }
     @ExceptionHandler(AuthenticationFailure.class)
     void authentication(AuthenticationFailure e,HttpServletRequest req,HttpServletResponse res) throws IOException {
         writer.write(req,res,e.status(),e.code(),e.getMessage());
@@ -35,11 +71,31 @@ public class GlobalExceptionHandler {
     void queryValidation(AdminUserQueryValidationException e,HttpServletRequest req,HttpServletResponse res) throws IOException {
         writer.write(req,res,400,"VALIDATION_ERROR","The request is invalid.");
     }
+    @ExceptionHandler(FacultyQueryValidationException.class)
+    void facultyQueryValidation(FacultyQueryValidationException e,HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,400,"VALIDATION_ERROR","The request is invalid.");
+    }
+    @ExceptionHandler(FacultyNotFoundException.class)
+    void facultyNotFound(FacultyNotFoundException e,HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,404,"FACULTY_NOT_FOUND",e.getMessage());
+    }
+    @ExceptionHandler(FacultyCodeAlreadyExistsException.class)
+    void facultyCodeDuplicate(FacultyCodeAlreadyExistsException e,HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,409,"FACULTY_CODE_ALREADY_EXISTS",e.getMessage());
+    }
+    @ExceptionHandler(FacultyNameAlreadyExistsException.class)
+    void facultyNameDuplicate(FacultyNameAlreadyExistsException e,HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,409,"FACULTY_NAME_ALREADY_EXISTS",e.getMessage());
+    }
     @ExceptionHandler({MethodArgumentNotValidException.class,HttpMessageNotReadableException.class,jakarta.validation.ConstraintViolationException.class,
             org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
             org.springframework.web.bind.MissingServletRequestParameterException.class})
     void validation(Exception e,HttpServletRequest req,HttpServletResponse res) throws IOException {
         writer.write(req,res,400,"VALIDATION_ERROR","The request is invalid.");
+    }
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    void notFound(Exception e,HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,404,"NOT_FOUND","The requested resource does not exist.");
     }
     @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
     void methodNotSupported(Exception e,HttpServletRequest req,HttpServletResponse res) throws IOException {
