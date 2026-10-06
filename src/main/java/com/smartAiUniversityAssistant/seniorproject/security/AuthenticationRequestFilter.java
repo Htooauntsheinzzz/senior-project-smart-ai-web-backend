@@ -23,18 +23,23 @@ public class AuthenticationRequestFilter extends OncePerRequestFilter {
         boolean departmentsPath=path.equals("/api/v1/admin/departments") || path.startsWith("/api/v1/admin/departments/");
         boolean programsPath=path.equals("/api/v1/admin/programs") || path.startsWith("/api/v1/admin/programs/");
         boolean semestersPath=path.equals("/api/v1/admin/semesters") || path.startsWith("/api/v1/admin/semesters/");
+        boolean studentsPath=path.equals("/api/v1/admin/students") || path.startsWith("/api/v1/admin/students/");
+        boolean studentAuthPath=path.startsWith("/api/v1/student/");
         boolean createUser=path.equals("/api/v1/admin/users") && request.getMethod().equals("POST");
         boolean mutationMethod=request.getMethod().equals("POST") || request.getMethod().equals("PUT") || request.getMethod().equals("PATCH");
-        boolean adminMutation=(usersPath || facultiesPath || departmentsPath || programsPath || semestersPath) && mutationMethod;
+        boolean adminMutation=(usersPath || facultiesPath || departmentsPath || programsPath || semestersPath || studentsPath || studentAuthPath) && mutationMethod;
         long start=System.nanoTime();
         try {
-            if (authPath || usersPath || facultiesPath || departmentsPath || programsPath || semestersPath) response.setHeader("Cache-Control","no-store");
+            if (authPath || usersPath || facultiesPath || departmentsPath || programsPath || semestersPath || studentsPath || studentAuthPath) response.setHeader("Cache-Control","no-store");
             if (request.getMethod().equals("POST") && (path.equals("/api/v1/admin/auth/login") || path.equals("/api/v1/admin/auth/refresh") || path.equals("/api/v1/admin/auth/change-password")) || adminMutation) {
                 if (path.equals("/api/v1/admin/auth/login")) throttle.check("login-ip",request.getRemoteAddr(),properties.throttle().loginPerIp());
                 if (path.equals("/api/v1/admin/auth/refresh")) throttle.check("refresh-ip",request.getRemoteAddr(),properties.throttle().refreshPerIp());
                 if (createUser) throttle.check("provision-ip",request.getRemoteAddr(),properties.throttle().loginPerIp());
+                if (path.equals("/api/v1/student/auth/login")) throttle.check("student-login-ip",request.getRemoteAddr(),properties.throttle().loginPerIp());
+                if (path.equals("/api/v1/student/auth/register")) throttle.check("student-register-ip",request.getRemoteAddr(),properties.throttle().loginPerIp());
+                if (path.equals("/api/v1/student/auth/refresh")) throttle.check("student-refresh-ip",request.getRemoteAddr(),properties.throttle().refreshPerIp());
                 byte[] bytes=request.getInputStream().readNBytes(16385);
-                if ((usersPath || facultiesPath || departmentsPath || programsPath || semestersPath) && bytes.length>16384) throw new AuthenticationFailure(413,"CONTENT_TOO_LARGE","The request body is too large.");
+                if ((usersPath || facultiesPath || departmentsPath || programsPath || semestersPath || studentsPath || studentAuthPath) && bytes.length>16384) throw new AuthenticationFailure(413,"CONTENT_TOO_LARGE","The request body is too large.");
                 var input=new ByteArrayInputStream(bytes);
                 request=new HttpServletRequestWrapper(request) {
                     @Override public ServletInputStream getInputStream() {

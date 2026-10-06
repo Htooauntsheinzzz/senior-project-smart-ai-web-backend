@@ -346,7 +346,7 @@ class AuthenticationIntegrationTests extends IntegrationSupport {
     @Test void migrationHistoryAndSchemaStayValid() {
         assertThat(db.queryForList("SELECT checksum FROM flyway_schema_history WHERE version IN ('1','2','3','4','5','6') ORDER BY installed_rank",Integer.class))
                 .containsExactly(-1609524967,-715303110,750119622,111998084,-1083275929,347487127);
-        assertThat(db.queryForObject("SELECT count(*) FROM flyway_schema_history",Integer.class)).isEqualTo(15);
+        assertThat(db.queryForObject("SELECT count(*) FROM flyway_schema_history",Integer.class)).isEqualTo(18);
         assertThat(db.queryForObject("SELECT description FROM flyway_schema_history WHERE version='7'",String.class))
                 .isEqualTo("seed super admin account");
         assertThat(db.queryForObject("SELECT description FROM flyway_schema_history WHERE version='8'",String.class))
@@ -365,7 +365,13 @@ class AuthenticationIntegrationTests extends IntegrationSupport {
                 .isEqualTo("create courses");
         assertThat(db.queryForObject("SELECT description FROM flyway_schema_history WHERE version='15'",String.class))
                 .isEqualTo("create course sections");
-        assertThat(db.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_schema='public'",Integer.class)).isEqualTo(12);
+        assertThat(db.queryForObject("SELECT description FROM flyway_schema_history WHERE version='16'",String.class))
+                .isEqualTo("create students");
+        assertThat(db.queryForObject("SELECT description FROM flyway_schema_history WHERE version='17'",String.class))
+                .isEqualTo("create student credentials");
+        assertThat(db.queryForObject("SELECT description FROM flyway_schema_history WHERE version='18'",String.class))
+                .isEqualTo("allow self registered students without academics");
+        assertThat(db.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_schema='public'",Integer.class)).isEqualTo(14);
         assertThat(db.queryForObject("SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('app_roles','app_users','app_user_roles','appuser_credentials')",Integer.class)).isEqualTo(34);
     }
 }

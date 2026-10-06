@@ -50,6 +50,11 @@ public class GlobalExceptionHandler {
             HttpServletRequest req,HttpServletResponse res) throws IOException {
         writer.write(req,res,e.status(),e.code(),e.getMessage());
     }
+    @ExceptionHandler(com.smartAiUniversityAssistant.seniorproject.feature.student.exception.StudentFailure.class)
+    void student(com.smartAiUniversityAssistant.seniorproject.feature.student.exception.StudentFailure e,
+            HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,e.status(),e.code(),e.getMessage());
+    }
     @ExceptionHandler(AuthenticationFailure.class)
     void authentication(AuthenticationFailure e,HttpServletRequest req,HttpServletResponse res) throws IOException {
         writer.write(req,res,e.status(),e.code(),e.getMessage());
@@ -87,6 +92,10 @@ public class GlobalExceptionHandler {
             org.springframework.web.bind.MissingServletRequestParameterException.class})
     void validation(Exception e,HttpServletRequest req,HttpServletResponse res) throws IOException {
         writer.write(req,res,400,"VALIDATION_ERROR","The request is invalid.");
+    }
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    void notFound(Exception e,HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,404,"NOT_FOUND","The requested resource does not exist.");
     }
     @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
     void methodNotSupported(Exception e,HttpServletRequest req,HttpServletResponse res) throws IOException {
