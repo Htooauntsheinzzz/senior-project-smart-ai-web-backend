@@ -63,7 +63,7 @@ class StudentIntegrationTests extends IntegrationSupport {
         departmentB = id("INSERT INTO departments(department_code,department_name,faculty_id,created_by) VALUES ('BIO','Biology',?,?) RETURNING id", facultyB, actorId);
         programA = id("INSERT INTO programs(program_code,program_name,degree_level,department_id,created_by) VALUES ('BSCS','BSc Computer Science','Bachelor',?,?) RETURNING id", departmentA, actorId);
         programB = id("INSERT INTO programs(program_code,program_name,degree_level,department_id,created_by) VALUES ('BSBIO','BSc Biology','Bachelor',?,?) RETURNING id", departmentB, actorId);
-        semester = id("INSERT INTO semesters(semester_name_th,semester_name_en,created_by) VALUES ('ภาคการศึกษาที่ 1','Semester 1',?) RETURNING id", actorId);
+        semester = id("INSERT INTO semesters(academic_year,semester_name_th,semester_name_en,created_by) VALUES (2026,'ภาคการศึกษาที่ 1','Semester 1',?) RETURNING id", actorId);
     }
 
     @AfterEach
@@ -73,11 +73,13 @@ class StudentIntegrationTests extends IntegrationSupport {
         db.update("DROP TRIGGER IF EXISTS fail_student_activation ON students");
         // Other feature tests delete faculties and app_users, which students reference.
         db.update("DELETE FROM student_credentials");
+        db.update("DELETE FROM enrollments");
         db.update("DELETE FROM students");
     }
 
     private void cleanDatabase() {
         db.update("DELETE FROM student_credentials");
+        db.update("DELETE FROM enrollments");
         db.update("DELETE FROM students");
         db.update("UPDATE app_users SET department_id=NULL,created_by=NULL,updated_by=NULL");
         db.update("DELETE FROM course_sections");

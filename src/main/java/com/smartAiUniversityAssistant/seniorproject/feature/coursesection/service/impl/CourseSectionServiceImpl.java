@@ -10,6 +10,8 @@ import com.smartAiUniversityAssistant.seniorproject.feature.coursesection.except
 import com.smartAiUniversityAssistant.seniorproject.feature.coursesection.mapper.CourseSectionMapper;
 import com.smartAiUniversityAssistant.seniorproject.feature.coursesection.repository.CourseSectionRepository;
 import com.smartAiUniversityAssistant.seniorproject.feature.coursesection.service.CourseSectionService;
+import com.smartAiUniversityAssistant.seniorproject.feature.enrollment.enums.EnrollmentStatus;
+import com.smartAiUniversityAssistant.seniorproject.feature.enrollment.repository.EnrollmentRepository;
 import com.smartAiUniversityAssistant.seniorproject.feature.lecture.entity.Lecture;
 import com.smartAiUniversityAssistant.seniorproject.feature.lecture.exception.LectureNotFoundException;
 import com.smartAiUniversityAssistant.seniorproject.feature.lecture.repository.LectureRepository;
@@ -34,17 +36,19 @@ public class CourseSectionServiceImpl implements CourseSectionService {
     private final CourseRepository courses;
     private final LectureRepository lectures;
     private final SemesterRepository semesters;
+    private final EnrollmentRepository enrollments;
     private final CourseSectionMapper mapper;
     private final Clock clock;
     private final EntityManager entityManager;
 
     public CourseSectionServiceImpl(CourseSectionRepository sections, CourseRepository courses,
-            LectureRepository lectures, SemesterRepository semesters, CourseSectionMapper mapper, Clock clock,
-            EntityManager entityManager) {
+            LectureRepository lectures, SemesterRepository semesters, EnrollmentRepository enrollments,
+            CourseSectionMapper mapper, Clock clock, EntityManager entityManager) {
         this.sections = sections;
         this.courses = courses;
         this.lectures = lectures;
         this.semesters = semesters;
+        this.enrollments = enrollments;
         this.mapper = mapper;
         this.clock = clock;
         this.entityManager = entityManager;
@@ -74,7 +78,7 @@ public class CourseSectionServiceImpl implements CourseSectionService {
         section.setCreatedBy(actor.userId());
         section.setCreatedAt(now());
         try {
-            return mapper.response(sections.saveAndFlush(section));
+            return mapper.response(sections.saveAndFlush(section), 0);
         } catch (DataIntegrityViolationException e) {
             throw translate(e);
         }
@@ -83,14 +87,20 @@ public class CourseSectionServiceImpl implements CourseSectionService {
     @Override @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ, timeout = 15)
     public CourseSectionPageResponse list(AuthenticatedUser actor, CourseSectionListQuery query) {
         requireFull(actor);
-        return mapper.page(sections.findAll(specification(query), query.pageable()), query);
+        var page = sections.findAll(specification(query), query.pageable());
+        var enrolled = new HashMap<Long, Long>();
+        if (!page.isEmpty())
+            enrollments.countOccupiedSeats(page.getContent().stream().map(CourseSection::getId).toList(),
+                    EnrollmentStatus.SEAT_HOLDING).forEach(row -> enrolled.put(row.getSectionId(), row.getTotal()));
+        return mapper.page(page, query, enrolled);
     }
 
     @Override @Transactional(readOnly = true, timeout = 15)
     public CourseSectionResponse detail(AuthenticatedUser actor, long id) {
         requireFull(actor);
         positiveId(id);
-        return mapper.response(sections.findByIdAndDeletedFalse(id).orElseThrow(CourseSectionNotFoundException::new));
+        CourseSection section = sections.findByIdAndDeletedFalse(id).orElseThrow(CourseSectionNotFoundException::new);
+        return mapper.response(section, enrolled(id));
     }
 
     @Override @Transactional(timeout = 15)
@@ -105,6 +115,10 @@ public class CourseSectionServiceImpl implements CourseSectionService {
         Semester semester = selectedSemester(request.semesterId());
         String status = CourseSectionStatus.fromValue(request.status()).getValue();
         duplicates(id, course.getId(), request.sectionNumber(), semester.getId());
+        // The Section row lock blocks concurrent enrollments, so this count is stable until commit.
+        long enrolled = enrolled(id);
+        if (request.capacity() < enrolled) throw new CourseSectionFailure(409, "COURSE_SECTION_CAPACITY_BELOW_ENROLLED",
+                "Capacity cannot be lower than the number of students already enrolled in this section.");
         section.setCourse(course);
         section.setSectionNumber(request.sectionNumber());
         section.setCapacity(request.capacity());
@@ -120,7 +134,7 @@ public class CourseSectionServiceImpl implements CourseSectionService {
         } catch (DataIntegrityViolationException e) {
             throw translate(e);
         }
-        return mapper.response(section);
+        return mapper.response(section, enrolled);
     }
 
     @Override @Transactional(timeout = 15)
@@ -141,13 +155,19 @@ public class CourseSectionServiceImpl implements CourseSectionService {
         long total = sections.countByDeletedFalse();
         long active = sections.countByStatusAndDeletedFalse(CourseSectionStatus.ACTIVE.getValue());
         long closed = sections.countByStatusAndDeletedFalse(CourseSectionStatus.CLOSED.getValue());
-        return new CourseSectionSummaryResponse(total, active, closed, 0, 0);
+        long full = enrollments.countFullSections(EnrollmentStatus.SEAT_HOLDING);
+        long totalEnrolled = enrollments.countOccupiedSeatsInLiveSections(EnrollmentStatus.SEAT_HOLDING);
+        return new CourseSectionSummaryResponse(total, active, closed, full, totalEnrolled);
     }
 
     private CourseSection locked(long id) {
         CourseSection section = sections.findByIdForUpdate(id).orElseThrow(CourseSectionNotFoundException::new);
         if (section.isDeleted()) throw new CourseSectionNotFoundException();
         return section;
+    }
+
+    private long enrolled(long sectionId) {
+        return enrollments.countOccupiedSeats(sectionId, EnrollmentStatus.SEAT_HOLDING);
     }
 
     private Course selectedCourse(Long id) {

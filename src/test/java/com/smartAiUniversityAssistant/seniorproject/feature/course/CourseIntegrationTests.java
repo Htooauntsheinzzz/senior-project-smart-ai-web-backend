@@ -51,6 +51,7 @@ class CourseIntegrationTests extends IntegrationSupport {
             return null;
         });
         db.update("UPDATE app_users SET department_id=NULL,created_by=NULL,updated_by=NULL");
+        db.update("DELETE FROM enrollments");
         db.update("DELETE FROM course_sections");
         db.update("DELETE FROM courses");
         db.update("DELETE FROM lectures");
@@ -523,7 +524,7 @@ class CourseIntegrationTests extends IntegrationSupport {
     }
     private long semester(String nameTh, String nameEn) {
         return db.queryForObject(
-                "INSERT INTO semesters(semester_name_th,semester_name_en,created_by) VALUES (?,?,?) RETURNING id",
+                "INSERT INTO semesters(academic_year,semester_name_th,semester_name_en,created_by) VALUES (2026,?,?,?) RETURNING id",
                 Long.class, nameTh, nameEn, actorId);
     }
     private String login() throws Exception {

@@ -481,22 +481,25 @@ with `SUPER_ADMIN`, `ADMIN`, or `ACADEMIC_ADMIN` authority:
 | PUT | `/api/v1/admin/semesters/{id}` | 200 |
 | DELETE | `/api/v1/admin/semesters/{id}` | 204, empty body |
 
-Create and update bodies (both fields are required, trimmed, max 150):
+Create and update bodies (all fields are required; `academicYear` is a
+Gregorian year from 2000 to 2100, names are trimmed, max 150):
 
 ```json
 {
+  "academicYear": 2026,
   "semesterNameTh": "ภาคการศึกษาที่ 1",
   "semesterNameEn": "Semester 1"
 }
 ```
 
 The list supports `page=0&size=20` (max size 100), `search` (literal
-case-insensitive match across both Thai and English names), and repeatable
-`sort=field,direction` entries (max three). Sort fields: `id`, `semesterNameTh`,
+case-insensitive match across both Thai and English names), an exact
+`academicYear` filter (2000-2100), and repeatable `sort=field,direction` entries
+(max three). Sort fields: `id`, `academicYear`, `semesterNameTh`,
 `semesterNameEn`, `createdAt`, `updatedAt`; default `createdAt,desc` then
 `id,asc`. There is intentionally **no** `isActive`, status filter, or summary
-endpoint. The Thai/English pair is unique and stays reserved after soft
-deletion: duplicates return `409 SEMESTER_ALREADY_EXISTS`; missing or deleted
+endpoint. The academic year plus Thai/English names are unique (the same
+names may repeat in another year) and stay reserved after soft deletion: duplicates return `409 SEMESTER_ALREADY_EXISTS`; missing or deleted
 records (including repeated DELETE) return `404 SEMESTER_NOT_FOUND`. Responses
 are plain DTOs with UTC audit timestamps, and audit IDs always come from the
 token.

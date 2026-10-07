@@ -8,6 +8,7 @@ import lombok.Setter;
 @Entity @Table(name = "semesters") @Getter @Setter
 public class Semester {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
+    @Column(name = "academic_year", nullable = false) private Integer academicYear;
     @Column(name = "semester_name_th", nullable = false, length = 150) private String semesterNameTh;
     @Column(name = "semester_name_en", nullable = false, length = 150) private String semesterNameEn;
     @Column(name = "is_deleted", nullable = false) private boolean deleted;

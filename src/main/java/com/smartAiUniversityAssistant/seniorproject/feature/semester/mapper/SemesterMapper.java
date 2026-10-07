@@ -9,12 +9,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class SemesterMapper {
     public SemesterResponse response(Semester s) {
-        return new SemesterResponse(s.getId(), s.getSemesterNameTh(), s.getSemesterNameEn(),
+        return new SemesterResponse(s.getId(), s.getAcademicYear(), s.getSemesterNameTh(), s.getSemesterNameEn(),
                 s.getCreatedBy(), instant(s.getCreatedAt()), s.getUpdatedBy(), instant(s.getUpdatedAt()));
     }
 
     public SemesterListResponse listResponse(Semester s) {
-        return new SemesterListResponse(s.getId(), s.getSemesterNameTh(), s.getSemesterNameEn(),
+        return new SemesterListResponse(s.getId(), s.getAcademicYear(), s.getSemesterNameTh(), s.getSemesterNameEn(),
                 instant(s.getCreatedAt()), instant(s.getUpdatedAt()));
     }
 

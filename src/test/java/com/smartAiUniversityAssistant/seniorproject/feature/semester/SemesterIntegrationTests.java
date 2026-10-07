@@ -51,6 +51,7 @@ class SemesterIntegrationTests extends IntegrationSupport {
             return null;
         });
         db.update("UPDATE app_users SET department_id=NULL,created_by=NULL,updated_by=NULL");
+        db.update("DELETE FROM enrollments");
         db.update("DELETE FROM course_sections");
         db.update("DELETE FROM courses");
         db.update("DELETE FROM lectures");
@@ -79,10 +80,12 @@ class SemesterIntegrationTests extends IntegrationSupport {
         var credentials = db.queryForMap("SELECT * FROM appuser_credentials WHERE user_id=?", actorId);
         var sessions = redis.keys("susa:test:auth:session:*");
         var body = new LinkedHashMap<String, Object>();
+        body.put("academicYear", 2026);
         body.put("semesterNameTh", "  ภาคการศึกษาที่ 1  ");
         body.put("semesterNameEn", "  Semester 1  ");
         var created = perform(post(BASE), body).andExpect(status().isCreated())
                 .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("academicYear").value(2026))
                 .andExpect(jsonPath("semesterNameTh").value("ภาคการศึกษาที่ 1"))
                 .andExpect(jsonPath("semesterNameEn").value("Semester 1"))
                 .andExpect(jsonPath("createdBy").value(actorId))
@@ -97,8 +100,9 @@ class SemesterIntegrationTests extends IntegrationSupport {
         perform(get(BASE + "/" + id), null).andExpect(status().isOk())
                 .andExpect(jsonPath("semesterNameTh").value("ภาคการศึกษาที่ 1"));
         clock.advance(Duration.ofSeconds(5));
-        perform(put(BASE + "/" + id), Map.of("semesterNameTh", "ภาคการศึกษาที่หนึ่ง", "semesterNameEn", "First Semester"))
+        perform(put(BASE + "/" + id), Map.of("academicYear", 2027, "semesterNameTh", "ภาคการศึกษาที่หนึ่ง", "semesterNameEn", "First Semester"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("academicYear").value(2027))
                 .andExpect(jsonPath("updatedBy").value(actorId))
                 .andExpect(jsonPath("updatedAt").value(clock.instant().toString()));
         assertThat(db.queryForObject("SELECT created_by FROM semesters WHERE id=?", Long.class, id)).isEqualTo(actorId);
@@ -110,7 +114,7 @@ class SemesterIntegrationTests extends IntegrationSupport {
         perform(get(BASE + "/" + id), null).andExpect(status().isNotFound())
                 .andExpect(jsonPath("code").value("SEMESTER_NOT_FOUND"));
         perform(delete(BASE + "/" + id), null).andExpect(status().isNotFound());
-        perform(put(BASE + "/" + id), Map.of("semesterNameTh", "x", "semesterNameEn", "y")).andExpect(status().isNotFound());
+        perform(put(BASE + "/" + id), Map.of("academicYear", 2026, "semesterNameTh", "x", "semesterNameEn", "y")).andExpect(status().isNotFound());
         assertThat(db.queryForMap("SELECT * FROM appuser_credentials WHERE user_id=?", actorId)).isEqualTo(credentials);
         assertThat(redis.keys("susa:test:auth:session:*")).isEqualTo(sessions);
     }
@@ -118,32 +122,72 @@ class SemesterIntegrationTests extends IntegrationSupport {
     @Test
     void duplicatesPairedNamesReservedAfterSoftDelete() throws Exception {
         long first = create("ภาคการศึกษาที่ 1", "Semester 1");
-        perform(post(BASE), Map.of("semesterNameTh", "  ภาคการศึกษาที่ 1 ", "semesterNameEn", " Semester 1"))
+        perform(post(BASE), Map.of("academicYear", 2026, "semesterNameTh", "  ภาคการศึกษาที่ 1 ", "semesterNameEn", " Semester 1"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("code").value("SEMESTER_ALREADY_EXISTS"));
-        perform(post(BASE), Map.of("semesterNameTh", "ภาคการศึกษาที่ 1", "semesterNameEn", "First Semester"))
+        perform(post(BASE), Map.of("academicYear", 2026, "semesterNameTh", "ภาคการศึกษาที่ 1", "semesterNameEn", "First Semester"))
                 .andExpect(status().isCreated());
-        perform(post(BASE), Map.of("semesterNameTh", "ภาคการศึกษาที่หนึ่ง", "semesterNameEn", "Semester 1"))
+        perform(post(BASE), Map.of("academicYear", 2026, "semesterNameTh", "ภาคการศึกษาที่หนึ่ง", "semesterNameEn", "Semester 1"))
                 .andExpect(status().isCreated());
-        perform(put(BASE + "/" + first), Map.of("semesterNameTh", "ภาคการศึกษาที่ 2", "semesterNameEn", "Semester 2"))
+        perform(put(BASE + "/" + first), Map.of("academicYear", 2026, "semesterNameTh", "ภาคการศึกษาที่ 2", "semesterNameEn", "Semester 2"))
                 .andExpect(status().isOk());
         var renamed = db.queryForObject("SELECT updated_at FROM semesters WHERE id=?", java.sql.Timestamp.class, first);
-        perform(put(BASE + "/" + first), Map.of("semesterNameTh", "ภาคการศึกษาที่ 1", "semesterNameEn", "First Semester"))
+        perform(put(BASE + "/" + first), Map.of("academicYear", 2026, "semesterNameTh", "ภาคการศึกษาที่ 1", "semesterNameEn", "First Semester"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("code").value("SEMESTER_ALREADY_EXISTS"));
         perform(get(BASE + "/" + first), null).andExpect(status().isOk())
                 .andExpect(jsonPath("semesterNameEn").value("Semester 2"));
         assertThat(db.queryForObject("SELECT updated_at FROM semesters WHERE id=?", java.sql.Timestamp.class, first)).isEqualTo(renamed);
         perform(delete(BASE + "/" + first), null).andExpect(status().isNoContent());
-        perform(post(BASE), Map.of("semesterNameTh", "ภาคการศึกษาที่ 2", "semesterNameEn", "Semester 2"))
+        perform(post(BASE), Map.of("academicYear", 2026, "semesterNameTh", "ภาคการศึกษาที่ 2", "semesterNameEn", "Semester 2"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("code").value("SEMESTER_ALREADY_EXISTS"));
         // Exact-case uniqueness, matching the database constraint and existing features.
-        perform(post(BASE), Map.of("semesterNameTh", "ภาคการศึกษาที่ 1", "semesterNameEn", "semester 1"))
+        perform(post(BASE), Map.of("academicYear", 2026, "semesterNameTh", "ภาคการศึกษาที่ 1", "semesterNameEn", "semester 1"))
                 .andExpect(status().isCreated());
     }
 
     @Test
-    void strictInputValidationAndUnknownFields() throws Exception {
-        for (String field : List.of("semesterNameTh", "semesterNameEn")) {
+    void academicYearIsValidatedScopesUniquenessAndFiltersTheList() throws Exception {
+        long first = create(2026, "ภาคการศึกษาที่ 1", "Semester 1");
+        long next = create(2027, "ภาคการศึกษาที่ 1", "Semester 1");
+        perform(post(BASE), Map.of("academicYear", 2027, "semesterNameTh", "ภาคการศึกษาที่ 1", "semesterNameEn", "Semester 1"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("code").value("SEMESTER_ALREADY_EXISTS"));
+        perform(put(BASE + "/" + first), Map.of("academicYear", 2027, "semesterNameTh", "ภาคการศึกษาที่ 1", "semesterNameEn", "Semester 1"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("code").value("SEMESTER_ALREADY_EXISTS"));
+        for (Object invalid : Arrays.asList(1999, 2101, 0, -2026, null, "2026", 2026.5, true)) {
             var body = new LinkedHashMap<String, Object>();
+            body.put("academicYear", invalid);
+            body.put("semesterNameTh", "ภาค");
+            body.put("semesterNameEn", "Invalid");
+            perform(post(BASE), body).andExpect(status().isBadRequest()).andExpect(jsonPath("code").value("VALIDATION_ERROR"));
+            perform(put(BASE + "/" + first), body).andExpect(status().isBadRequest()).andExpect(jsonPath("code").value("VALIDATION_ERROR"));
+        }
+        assertThat(db.queryForObject("SELECT academic_year FROM semesters WHERE id=?", Integer.class, first)).isEqualTo(2026);
+        perform(put(BASE + "/" + first), Map.of("academicYear", 2028, "semesterNameTh", "ภาคการศึกษาที่ 1", "semesterNameEn", "Semester 1"))
+                .andExpect(status().isOk()).andExpect(jsonPath("academicYear").value(2028));
+        perform(put(BASE + "/" + first), Map.of("academicYear", 2026, "semesterNameTh", "ภาคการศึกษาที่ 1", "semesterNameEn", "Semester 1"))
+                .andExpect(status().isOk()).andExpect(jsonPath("academicYear").value(2026));
+        long lowest = create(2000, "ภาคการศึกษาที่ 1", "Semester 1");
+        long highest = create(2100, "ภาคการศึกษาที่ 1", "Semester 1");
+        perform(get(BASE).param("academicYear", "2000"), null).andExpect(status().isOk())
+                .andExpect(jsonPath("totalElements").value(1)).andExpect(jsonPath("content[0].id").value(lowest));
+        perform(delete(BASE + "/" + lowest), null).andExpect(status().isNoContent());
+        perform(delete(BASE + "/" + highest), null).andExpect(status().isNoContent());
+        perform(post(BASE), Map.of("academicYear", 2000, "semesterNameTh", "ภาคการศึกษาที่ 1", "semesterNameEn", "Semester 1"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("code").value("SEMESTER_ALREADY_EXISTS"));
+        perform(get(BASE).param("academicYear", "2027"), null).andExpect(status().isOk())
+                .andExpect(jsonPath("totalElements").value(1))
+                .andExpect(jsonPath("content[0].id").value(next))
+                .andExpect(jsonPath("content[0].academicYear").value(2027));
+        perform(get(BASE).param("sort", "academicYear,desc"), null).andExpect(status().isOk())
+                .andExpect(jsonPath("content[0].id").value(next)).andExpect(jsonPath("content[1].id").value(first));
+        for (String query : List.of("academicYear=abc", "academicYear=1999", "academicYear=2101", "academicYear=2026&academicYear=2027"))
+            perform(get(BASE + "?" + query), null).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void strictInputValidationAndUnknownFields() throws Exception {
+        for (String field : List.of("academicYear", "semesterNameTh", "semesterNameEn")) {
+            var body = new LinkedHashMap<String, Object>();
+            body.put("academicYear", 2026);
             body.put("semesterNameTh", "ภาคการศึกษาที่ 1");
             body.put("semesterNameEn", "Semester 1");
             body.remove(field);
@@ -152,6 +196,7 @@ class SemesterIntegrationTests extends IntegrationSupport {
         for (Object invalid : Arrays.asList("", "   ", "x".repeat(151), null)) {
             for (String field : List.of("semesterNameTh", "semesterNameEn")) {
                 var body = new LinkedHashMap<String, Object>();
+                body.put("academicYear", 2026);
                 body.put("semesterNameTh", "ภาคการศึกษาที่ 1");
                 body.put("semesterNameEn", "Semester 1");
                 body.put(field, invalid);
@@ -160,14 +205,16 @@ class SemesterIntegrationTests extends IntegrationSupport {
         }
         for (String field : List.of("createdBy", "updatedBy", "isDeleted", "isActive", "semesterCode", "academicYearId")) {
             var body = new LinkedHashMap<String, Object>();
+            body.put("academicYear", 2026);
             body.put("semesterNameTh", "ภาคการศึกษาที่ 1");
             body.put("semesterNameEn", "Semester 1");
             body.put(field, 1);
             perform(post(BASE), body).andExpect(status().isBadRequest()).andExpect(jsonPath("code").value("VALIDATION_ERROR"));
         }
         long id = create("ภาคการศึกษาที่ 9", "Ninth Semester");
-        for (String field : List.of("semesterNameTh", "semesterNameEn")) {
+        for (String field : List.of("academicYear", "semesterNameTh", "semesterNameEn")) {
             var body = new LinkedHashMap<String, Object>();
+            body.put("academicYear", 2026);
             body.put("semesterNameTh", "ภาคการศึกษาที่ 9");
             body.put("semesterNameEn", "Ninth Semester");
             body.remove(field);
@@ -218,7 +265,7 @@ class SemesterIntegrationTests extends IntegrationSupport {
         for (String role : List.of("SUPER_ADMIN", "ADMIN", "ACADEMIC_ADMIN")) {
             setRole(role);
             long id = create(role + " ภาค", role + " Semester");
-            perform(put(BASE + "/" + id), Map.of("semesterNameTh", role + " ภาคอัปเดต", "semesterNameEn", role + " Updated"))
+            perform(put(BASE + "/" + id), Map.of("academicYear", 2026, "semesterNameTh", role + " ภาคอัปเดต", "semesterNameEn", role + " Updated"))
                     .andExpect(status().isOk());
             perform(delete(BASE + "/" + id), null).andExpect(status().isNoContent());
         }
@@ -226,11 +273,11 @@ class SemesterIntegrationTests extends IntegrationSupport {
         setRole("SEM_TEST_READER"); // Existing token still claims SUPER_ADMIN: database roles must win.
         for (var route : List.of(get(BASE), get(BASE + "/1"), delete(BASE + "/1")))
             perform(route, null).andExpect(status().isForbidden());
-        perform(post(BASE), Map.of("semesterNameTh", "ภาค", "semesterNameEn", "Denied")).andExpect(status().isForbidden());
+        perform(post(BASE), Map.of("academicYear", 2026, "semesterNameTh", "ภาค", "semesterNameEn", "Denied")).andExpect(status().isForbidden());
         setRole("SUPER_ADMIN");
         db.update("UPDATE appuser_credentials SET force_password_change=TRUE WHERE user_id=?", actorId);
         perform(get(BASE), null).andExpect(status().isForbidden()).andExpect(jsonPath("code").value("PASSWORD_CHANGE_REQUIRED"));
-        perform(post(BASE), Map.of("semesterNameTh", "ภาค", "semesterNameEn", "Denied")).andExpect(status().isForbidden());
+        perform(post(BASE), Map.of("academicYear", 2026, "semesterNameTh", "ภาค", "semesterNameEn", "Denied")).andExpect(status().isForbidden());
         db.update("UPDATE appuser_credentials SET force_password_change=FALSE WHERE user_id=?", actorId);
         mvc.perform(get(BASE).header("Authorization", "Bearer invalid")).andExpect(status().isUnauthorized());
         for (var route : List.of(get(BASE), get(BASE + "/1"), delete(BASE + "/1"), post(BASE), put(BASE + "/1")))
@@ -255,7 +302,7 @@ class SemesterIntegrationTests extends IntegrationSupport {
             var barrier = new CyclicBarrier(2);
             Callable<Integer> attempt = () -> {
                 barrier.await();
-                return perform(post(BASE), Map.of("semesterNameTh", "ภาคการศึกษาที่แข่ง", "semesterNameEn", "Race Semester"))
+                return perform(post(BASE), Map.of("academicYear", 2026, "semesterNameTh", "ภาคการศึกษาที่แข่ง", "semesterNameEn", "Race Semester"))
                         .andReturn().getResponse().getStatus();
             };
             var first = pool.submit(attempt);
@@ -277,7 +324,10 @@ class SemesterIntegrationTests extends IntegrationSupport {
         return tree(result).get("accessToken").asText();
     }
     private long create(String nameTh, String nameEn) throws Exception {
-        return tree(perform(post(BASE), Map.of("semesterNameTh", nameTh, "semesterNameEn", nameEn))
+        return create(2026, nameTh, nameEn);
+    }
+    private long create(int academicYear, String nameTh, String nameEn) throws Exception {
+        return tree(perform(post(BASE), Map.of("academicYear", academicYear, "semesterNameTh", nameTh, "semesterNameEn", nameEn))
                 .andExpect(status().isCreated()).andReturn()).get("id").asLong();
     }
     private ResultActions perform(MockHttpServletRequestBuilder builder, Object body) throws Exception {

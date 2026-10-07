@@ -51,6 +51,7 @@ class LectureIntegrationTests extends IntegrationSupport {
             return null;
         });
         db.update("UPDATE app_users SET department_id=NULL,created_by=NULL,updated_by=NULL");
+        db.update("DELETE FROM enrollments");
         db.update("DELETE FROM course_sections");
         db.update("DELETE FROM courses");
         db.update("DELETE FROM lectures");
