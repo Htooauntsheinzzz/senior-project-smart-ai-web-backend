@@ -35,8 +35,9 @@ public class SemesterServiceImpl implements SemesterService {
     @Override @Transactional(timeout = 15)
     public SemesterResponse create(AuthenticatedUser actor, SemesterCreateRequest request) {
         requireFull(actor);
-        duplicate(0L, request.semesterNameTh(), request.semesterNameEn());
+        duplicate(0L, request.academicYear(), request.semesterNameTh(), request.semesterNameEn());
         var semester = new Semester();
+        semester.setAcademicYear(request.academicYear());
         semester.setSemesterNameTh(request.semesterNameTh());
         semester.setSemesterNameEn(request.semesterNameEn());
         semester.setDeleted(false);
@@ -68,7 +69,8 @@ public class SemesterServiceImpl implements SemesterService {
         positiveId(id);
         lockTimeout();
         Semester semester = locked(id);
-        duplicate(id, request.semesterNameTh(), request.semesterNameEn());
+        duplicate(id, request.academicYear(), request.semesterNameTh(), request.semesterNameEn());
+        semester.setAcademicYear(request.academicYear());
         semester.setSemesterNameTh(request.semesterNameTh());
         semester.setSemesterNameEn(request.semesterNameEn());
         semester.setUpdatedBy(actor.userId());
@@ -99,9 +101,9 @@ public class SemesterServiceImpl implements SemesterService {
         return semester;
     }
 
-    private void duplicate(long id, String nameTh, String nameEn) {
-        // The paired UNIQUE constraint reserves name combinations even after soft deletion.
-        if (semesters.existsBySemesterNameThAndSemesterNameEnAndIdNot(nameTh, nameEn, id))
+    private void duplicate(long id, int academicYear, String nameTh, String nameEn) {
+        // The UNIQUE constraint reserves year + name combinations even after soft deletion.
+        if (semesters.existsByAcademicYearAndSemesterNameThAndSemesterNameEnAndIdNot(academicYear, nameTh, nameEn, id))
             throw new SemesterAlreadyExistsException();
     }
 
@@ -109,6 +111,7 @@ public class SemesterServiceImpl implements SemesterService {
         return (root, criteria, cb) -> {
             var predicates = new ArrayList<Predicate>();
             predicates.add(cb.isFalse(root.get("deleted")));
+            if (query.academicYear() != null) predicates.add(cb.equal(root.get("academicYear"), query.academicYear()));
             if (query.search() != null) {
                 String literal = query.search().toLowerCase(Locale.ROOT).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
                 predicates.add(cb.or(cb.like(cb.lower(root.get("semesterNameTh")), "%" + literal + "%", '\\'),
@@ -121,7 +124,7 @@ public class SemesterServiceImpl implements SemesterService {
     private RuntimeException translate(DataIntegrityViolationException exception) {
         for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
             if (cause instanceof org.hibernate.exception.ConstraintViolationException violation
-                    && "uk_semesters_name_th_en".equals(violation.getConstraintName()))
+                    && "uk_semesters_year_name_th_en".equals(violation.getConstraintName()))
                 return new SemesterAlreadyExistsException();
         }
         return exception;

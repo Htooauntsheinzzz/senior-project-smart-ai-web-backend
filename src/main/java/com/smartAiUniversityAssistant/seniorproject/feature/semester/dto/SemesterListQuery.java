@@ -5,14 +5,15 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.*;
 import org.springframework.data.domain.*;
 
-public record SemesterListQuery(int page, int size, String search, List<String> sort) {
-    private static final Set<String> PARAMETERS = Set.of("page", "size", "search", "sort");
-    private static final Set<String> SORT_FIELDS = Set.of("id", "semesterNameTh", "semesterNameEn", "createdAt", "updatedAt");
+public record SemesterListQuery(int page, int size, String search, Integer academicYear, List<String> sort) {
+    private static final Set<String> PARAMETERS = Set.of("page", "size", "search", "academicYear", "sort");
+    private static final Set<String> SORT_FIELDS = Set.of("id", "academicYear", "semesterNameTh", "semesterNameEn", "createdAt", "updatedAt");
 
     public SemesterListQuery {
         if (page < 0 || size < 1 || size > 100) throw invalid();
         search = search == null || search.isBlank() ? null : search.trim();
         if (search != null && search.length() > 150) throw invalid();
+        if (academicYear != null && (academicYear < 2000 || academicYear > 2100)) throw invalid();
         List<String> entries = sort == null || sort.isEmpty() ? List.of("createdAt,desc") : sort;
         if (entries.size() > 3) throw invalid();
         var fields = new HashSet<String>();
@@ -36,9 +37,10 @@ public record SemesterListQuery(int page, int size, String search, List<String> 
         try {
             long page = number(request.getParameter("page"), 0);
             long size = number(request.getParameter("size"), 20);
+            String year = request.getParameter("academicYear");
             String[] sort = request.getParameterValues("sort");
             return new SemesterListQuery(Math.toIntExact(page), Math.toIntExact(size), request.getParameter("search"),
-                    sort == null ? List.of() : List.of(sort));
+                    year == null ? null : Math.toIntExact(number(year, 0)), sort == null ? List.of() : List.of(sort));
         } catch (ArithmeticException | NumberFormatException e) {
             throw invalid();
         }

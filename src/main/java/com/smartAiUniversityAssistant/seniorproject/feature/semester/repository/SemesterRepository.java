@@ -9,7 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface SemesterRepository extends JpaRepository<Semester, Long>, JpaSpecificationExecutor<Semester> {
     Optional<Semester> findByIdAndDeletedFalse(Long id);
-    boolean existsBySemesterNameThAndSemesterNameEnAndIdNot(String nameTh, String nameEn, Long id);
+    boolean existsByAcademicYearAndSemesterNameThAndSemesterNameEnAndIdNot(Integer academicYear, String nameTh, String nameEn, Long id);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))
     @Query("select s from Semester s where s.id = :id")
