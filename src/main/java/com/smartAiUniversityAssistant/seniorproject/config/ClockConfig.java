@@ -8,7 +8,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties(AuthenticationProperties.class)
+@EnableConfigurationProperties({AuthenticationProperties.class, AiAssistantProperties.class,
+        AiAssistantContextProperties.class})
 public class ClockConfig {
     @Bean public Clock authenticationClock() { return Clock.systemUTC(); }
     @Bean public PasswordEncoder passwordEncoder(AuthenticationProperties properties) {

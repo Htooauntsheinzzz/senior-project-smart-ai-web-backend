@@ -60,6 +60,16 @@ public class GlobalExceptionHandler {
             HttpServletRequest req,HttpServletResponse res) throws IOException {
         writer.write(req,res,e.status(),e.code(),e.getMessage());
     }
+    @ExceptionHandler(com.smartAiUniversityAssistant.seniorproject.feature.academicquery.exception.AcademicQueryFailure.class)
+    void academicQuery(com.smartAiUniversityAssistant.seniorproject.feature.academicquery.exception.AcademicQueryFailure e,
+            HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,e.status(),e.code(),e.getMessage());
+    }
+    @ExceptionHandler(com.smartAiUniversityAssistant.seniorproject.feature.assistant.exception.AiAssistantFailure.class)
+    void assistant(com.smartAiUniversityAssistant.seniorproject.feature.assistant.exception.AiAssistantFailure e,
+            HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,e.status(),e.code(),e.getMessage());
+    }
     @ExceptionHandler(AuthenticationFailure.class)
     void authentication(AuthenticationFailure e,HttpServletRequest req,HttpServletResponse res) throws IOException {
         writer.write(req,res,e.status(),e.code(),e.getMessage());

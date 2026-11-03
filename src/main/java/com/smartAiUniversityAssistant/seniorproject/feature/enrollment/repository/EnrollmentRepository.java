@@ -39,6 +39,18 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long>, J
             @Param("semesterId") Long semesterId, @Param("statuses") Collection<EnrollmentStatus> statuses,
             @Param("excludeId") Long excludeId);
 
+    // Student academic views: one query fetches Section, Course, Semester and Lecturer for every row.
+    // Enrollments in a soft-deleted Section or Course are hidden, like countOccupiedSeatsInLiveSections.
+    @Query("""
+            select e from Enrollment e
+            join fetch e.courseSection cs join fetch cs.course c join fetch cs.semester sem join fetch cs.lecture l
+            where e.student.id = :studentId and e.status in :statuses and e.deleted = false
+              and cs.deleted = false and c.deleted = false
+            order by sem.academicYear desc, sem.id desc, c.courseCode asc, cs.sectionNumber asc, e.id asc
+            """)
+    List<Enrollment> findStudentAcademicEnrollments(@Param("studentId") Long studentId,
+            @Param("statuses") Collection<EnrollmentStatus> statuses);
+
     interface StatusCount {
         EnrollmentStatus getStatus();
         long getTotal();

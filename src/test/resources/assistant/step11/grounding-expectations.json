@@ -1,0 +1,23 @@
+{
+  "datasetVersion": "1.0",
+  "fixtureVersion": "step08-step09-v3",
+  "description": "Step 11 additions to step09/fixture-expectations.json: facts that only exist after a case's controlled admin change (setup/mutateBefore), extra entities for the unsupported-claim check, and the markers of the backend's deterministic replies. Minimum cases per scenario follow spec section 68.",
+  "facts": {
+    "CS301_ROOM_NEW": ["11-405"],
+    "CS301_LECTURER_NEW": ["Dr. Jane Lee", "Jane Lee"],
+    "CSC452_LECTURER": ["Dr. Jane Lee", "Jane Lee"],
+    "CSC452_ROOM": ["5-201"]
+  },
+  "extraEntities": ["11-405", "CS305", "CSC486", "Medicine"],
+  "verificationFailedMarkers": ["can't verify your academic information"],
+  "unsupportedScheduleMarkers": ["can't reliably work out"],
+  "minimumCases": {
+    "VERIFIED_FACTS": 20,
+    "MISSING_DATA": 15,
+    "TOOL_FAILURE": 10,
+    "AMBIGUOUS": 10,
+    "MULTI_FACT": 10,
+    "CONVERSATION_FRESHNESS": 10,
+    "PROMPT_INJECTION": 10
+  }
+}
