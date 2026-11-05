@@ -19,6 +19,8 @@ public abstract class IntegrationSupport {
             .withExposedPorts(6379).withCommand("redis-server","--requirepass","test-only-redis-password","--maxmemory-policy","noeviction");
     private static final Path PRIVATE_KEY;
     private static final Path PUBLIC_KEY;
+    /** Controlled temporary storage for knowledge document uploads. */
+    protected static final Path KNOWLEDGE_STORAGE;
     static {
         try {
             var directory=Files.createTempDirectory("susa-auth-test-keys-");
@@ -28,6 +30,7 @@ public abstract class IntegrationSupport {
             PRIVATE_KEY=directory.resolve("private.pem"); PUBLIC_KEY=directory.resolve("public.pem");
             writeKey(PRIVATE_KEY,"PRIVATE KEY",pair.getPrivate().getEncoded());
             writeKey(PUBLIC_KEY,"PUBLIC KEY",pair.getPublic().getEncoded());
+            KNOWLEDGE_STORAGE=Files.createTempDirectory("susa-knowledge-storage-");
             Startables.deepStart(POSTGRES,REDIS).join();
         } catch (Exception e) { throw new ExceptionInInitializerError(e); }
     }
@@ -51,6 +54,7 @@ public abstract class IntegrationSupport {
         r.add("app.security.jwt.public-key-path",() -> PUBLIC_KEY.toString());
         r.add("app.auth.password.bcrypt-strength",() -> "4");
         r.add("app.auth.session.key-prefix",() -> "susa:test:auth");
+        r.add("app.knowledge.storage.root",() -> KNOWLEDGE_STORAGE.toString());
     }
     @TestConfiguration(proxyBeanMethods=false) public static class TimeConfiguration {
         @Bean @Primary MutableClock testClock() { return new MutableClock(); }

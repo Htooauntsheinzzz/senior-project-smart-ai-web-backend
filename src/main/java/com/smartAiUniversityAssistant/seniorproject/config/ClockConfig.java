@@ -9,7 +9,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties({AuthenticationProperties.class, AiAssistantProperties.class,
-        AiAssistantContextProperties.class})
+        AiAssistantContextProperties.class, KnowledgeStorageProperties.class, StudentAcademicProperties.class, CampusProperties.class})
 public class ClockConfig {
     @Bean public Clock authenticationClock() { return Clock.systemUTC(); }
     @Bean public PasswordEncoder passwordEncoder(AuthenticationProperties properties) {

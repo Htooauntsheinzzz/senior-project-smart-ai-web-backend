@@ -70,6 +70,31 @@ public class GlobalExceptionHandler {
             HttpServletRequest req,HttpServletResponse res) throws IOException {
         writer.write(req,res,e.status(),e.code(),e.getMessage());
     }
+    @ExceptionHandler(com.smartAiUniversityAssistant.seniorproject.feature.curriculum.exception.CurriculumFailure.class)
+    void curriculum(com.smartAiUniversityAssistant.seniorproject.feature.curriculum.exception.CurriculumFailure e,
+            HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,e.status(),e.code(),e.getMessage());
+    }
+    @ExceptionHandler(com.smartAiUniversityAssistant.seniorproject.feature.knowledge.exception.KnowledgeFailure.class)
+    void knowledge(com.smartAiUniversityAssistant.seniorproject.feature.knowledge.exception.KnowledgeFailure e,
+            HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,e.status(),e.code(),e.getMessage());
+    }
+    @ExceptionHandler(com.smartAiUniversityAssistant.seniorproject.feature.academicresult.exception.AcademicResultFailure.class)
+    void academicResult(com.smartAiUniversityAssistant.seniorproject.feature.academicresult.exception.AcademicResultFailure e,
+            HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,e.status(),e.code(),e.getMessage());
+    }
+    @ExceptionHandler(com.smartAiUniversityAssistant.seniorproject.feature.academicactivity.exception.AcademicActivityFailure.class)
+    void academicActivity(com.smartAiUniversityAssistant.seniorproject.feature.academicactivity.exception.AcademicActivityFailure e,
+            HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,e.status(),e.code(),e.getMessage());
+    }
+    @ExceptionHandler(com.smartAiUniversityAssistant.seniorproject.feature.campus.exception.CampusFailure.class)
+    void campus(com.smartAiUniversityAssistant.seniorproject.feature.campus.exception.CampusFailure e,
+            HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,e.status(),e.code(),e.getMessage());
+    }
     @ExceptionHandler(AuthenticationFailure.class)
     void authentication(AuthenticationFailure e,HttpServletRequest req,HttpServletResponse res) throws IOException {
         writer.write(req,res,e.status(),e.code(),e.getMessage());
@@ -106,6 +131,14 @@ public class GlobalExceptionHandler {
             org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
             org.springframework.web.bind.MissingServletRequestParameterException.class})
     void validation(Exception e,HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,400,"VALIDATION_ERROR","The request is invalid.");
+    }
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    void uploadTooLarge(Exception e,HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,413,"DOCUMENT_FILE_TOO_LARGE","The document file exceeds the maximum upload size.");
+    }
+    @ExceptionHandler(org.springframework.web.multipart.MultipartException.class)
+    void malformedMultipart(Exception e,HttpServletRequest req,HttpServletResponse res) throws IOException {
         writer.write(req,res,400,"VALIDATION_ERROR","The request is invalid.");
     }
     @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)

@@ -1,7 +1,7 @@
 package com.smartAiUniversityAssistant.seniorproject.feature.coursesection.mapper;
 
 import com.smartAiUniversityAssistant.seniorproject.feature.coursesection.dto.*;
-import com.smartAiUniversityAssistant.seniorproject.feature.coursesection.entity.CourseSection;
+import com.smartAiUniversityAssistant.seniorproject.feature.coursesection.entity.*;
 import java.time.*;
 import java.util.Map;
 import org.springframework.data.domain.Page;
@@ -9,6 +9,14 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class CourseSectionMapper {
+    public CourseSectionMeetingResponse meeting(CourseSectionMeeting m) {
+        return new CourseSectionMeetingResponse(m.getId(), m.getCourseSection().getId(), m.getMeetingType().name(),
+                m.getDayOfWeek().intValue(), DayOfWeek.of(m.getDayOfWeek()).name(), m.getStartTime(), m.getEndTime(),
+                m.getEffectiveFrom(), m.getEffectiveTo(), m.getRoomId(), m.getRoomLabel(), m.isActive(),
+                m.getCreatedAt().toInstant(ZoneOffset.UTC),
+                m.getUpdatedAt() == null ? null : m.getUpdatedAt().toInstant(ZoneOffset.UTC));
+    }
+
     // enrolledCount counts PENDING + ACTIVE enrollments; isFull is enrolledCount >= capacity.
     public CourseSectionResponse response(CourseSection s, long enrolled) {
         var course = s.getCourse();

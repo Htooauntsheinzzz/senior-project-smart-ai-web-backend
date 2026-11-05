@@ -8,6 +8,6 @@ public record StudentResponse(Long id, String studentCode, String universityEmai
         Long departmentId, String departmentCode, String departmentName,
         Long programId, String programCode, String programName,
         Long semesterId, String semesterNameTh, String semesterNameEn,
-        Integer academicYear, Integer enrollmentYear,
+        Integer academicYear, Integer enrollmentYear, Integer studyYear,
         String accountStatus, boolean forcePasswordChange,
         Long createdBy, Instant createdAt, Long updatedBy, Instant updatedAt) {}

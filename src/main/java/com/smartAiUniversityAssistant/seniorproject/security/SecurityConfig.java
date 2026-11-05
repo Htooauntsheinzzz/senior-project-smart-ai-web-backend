@@ -56,6 +56,31 @@ public class SecurityConfig {
                             return new AuthorizationDecision(current.getAuthorities().stream()
                                     .anyMatch(authority -> authority.getAuthority().equals("ROLE_SUPER_ADMIN")));
                         })
+                        // Academic results: only the two explicitly academic-authorized roles, unlike the rest of the admin APIs.
+                        .requestMatchers("/api/v1/admin/academic/**").access((auth,context) -> {
+                            var current=auth.get();
+                            restricted.requireFull(current);
+                            return new AuthorizationDecision(current.getAuthorities().stream().anyMatch(authority ->
+                                    authority.getAuthority().equals("ROLE_SUPER_ADMIN")
+                                    || authority.getAuthority().equals("ROLE_ACADEMIC_ADMIN")));
+                        })
+                        // Campus: every admin role may read; only SUPER_ADMIN changes sites and navigation infrastructure;
+                        // ACADEMIC_ADMIN has no campus write access (spec file 41, section 56).
+                        .requestMatchers(HttpMethod.GET,"/api/v1/admin/campus/**").access((auth,context) -> {
+                            var current=auth.get();
+                            restricted.requireFull(current);
+                            return hasAnyRole(current,"ROLE_SUPER_ADMIN","ROLE_ADMIN","ROLE_ACADEMIC_ADMIN");
+                        })
+                        .requestMatchers("/api/v1/admin/campus/navigation/**","/api/v1/admin/campus/sites","/api/v1/admin/campus/sites/**").access((auth,context) -> {
+                            var current=auth.get();
+                            restricted.requireFull(current);
+                            return hasAnyRole(current,"ROLE_SUPER_ADMIN");
+                        })
+                        .requestMatchers("/api/v1/admin/campus/**").access((auth,context) -> {
+                            var current=auth.get();
+                            restricted.requireFull(current);
+                            return hasAnyRole(current,"ROLE_SUPER_ADMIN","ROLE_ADMIN");
+                        })
                         .requestMatchers("/api/v1/admin/faculties","/api/v1/admin/faculties/**",
                                 "/api/v1/admin/departments","/api/v1/admin/departments/**",
                                 "/api/v1/admin/programs","/api/v1/admin/programs/**",
@@ -64,7 +89,11 @@ public class SecurityConfig {
                                 "/api/v1/admin/courses","/api/v1/admin/courses/**",
                                 "/api/v1/admin/course-sections","/api/v1/admin/course-sections/**",
                                 "/api/v1/admin/students","/api/v1/admin/students/**",
-                                "/api/v1/admin/enrollments","/api/v1/admin/enrollments/**").access((auth,context) -> {
+                                "/api/v1/admin/enrollments","/api/v1/admin/enrollments/**",
+                                "/api/v1/admin/curriculums","/api/v1/admin/curriculums/**",
+                                "/api/v1/admin/assignments","/api/v1/admin/assignments/**",
+                                "/api/v1/admin/exams","/api/v1/admin/exams/**",
+                                "/api/v1/admin/knowledge/**").access((auth,context) -> {
                             var current=auth.get();
                             restricted.requireFull(current);
                             return new AuthorizationDecision(current.getAuthorities().stream().anyMatch(authority ->
@@ -80,6 +109,10 @@ public class SecurityConfig {
     private boolean isPublic(String method,String path) {
         return method.equals("POST") && (path.equals("/api/v1/admin/auth/login") || path.equals("/api/v1/admin/auth/refresh")
                 || java.util.Arrays.asList(STUDENT_PUBLIC).contains(path));
+    }
+    private static AuthorizationDecision hasAnyRole(org.springframework.security.core.Authentication auth,String... roles) {
+        var allowed=java.util.Set.of(roles);
+        return new AuthorizationDecision(auth.getAuthorities().stream().anyMatch(authority -> allowed.contains(authority.getAuthority())));
     }
     private static AuthorizationDecision admin(org.springframework.security.core.Authentication auth) {
         return new AuthorizationDecision(auth!=null && auth.isAuthenticated() && auth.getPrincipal() instanceof AuthenticatedUser);

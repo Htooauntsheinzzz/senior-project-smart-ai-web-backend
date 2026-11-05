@@ -347,7 +347,7 @@ class AuthenticationIntegrationTests extends IntegrationSupport {
     @Test void migrationHistoryAndSchemaStayValid() {
         assertThat(db.queryForList("SELECT checksum FROM flyway_schema_history WHERE version IN ('1','2','3','4','5','6') ORDER BY installed_rank",Integer.class))
                 .containsExactly(-1609524967,-715303110,750119622,111998084,-1083275929,347487127);
-        assertThat(db.queryForObject("SELECT count(*) FROM flyway_schema_history",Integer.class)).isEqualTo(20);
+        assertThat(db.queryForObject("SELECT count(*) FROM flyway_schema_history",Integer.class)).isEqualTo(39);
         assertThat(db.queryForObject("SELECT description FROM flyway_schema_history WHERE version='7'",String.class))
                 .isEqualTo("seed super admin account");
         assertThat(db.queryForObject("SELECT description FROM flyway_schema_history WHERE version='8'",String.class))
@@ -376,9 +376,19 @@ class AuthenticationIntegrationTests extends IntegrationSupport {
                 .isEqualTo("create enrollments");
         assertThat(db.queryForObject("SELECT description FROM flyway_schema_history WHERE version='20'",String.class))
                 .isEqualTo("add semester academic year");
+        assertThat(db.queryForObject("SELECT description FROM flyway_schema_history WHERE version='21'",String.class))
+                .isEqualTo("create curriculum versions");
+        assertThat(db.queryForObject("SELECT description FROM flyway_schema_history WHERE version='22'",String.class))
+                .isEqualTo("create document categories");
+        assertThat(db.queryForObject("SELECT description FROM flyway_schema_history WHERE version='23'",String.class))
+                .isEqualTo("create academic documents");
+        assertThat(db.queryForObject("SELECT description FROM flyway_schema_history WHERE version='24'",String.class))
+                .isEqualTo("create academic document files");
+        assertThat(db.queryForObject("SELECT description FROM flyway_schema_history WHERE version='25'",String.class))
+                .isEqualTo("create academic document processing");
         assertThat(db.queryForObject("SELECT is_nullable FROM information_schema.columns WHERE table_name='semesters' AND column_name='academic_year'",String.class))
                 .isEqualTo("NO");
-        assertThat(db.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_schema='public'",Integer.class)).isEqualTo(15);
+        assertThat(db.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_schema='public'",Integer.class)).isEqualTo(41);
         assertThat(db.queryForObject("SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('app_roles','app_users','app_user_roles','appuser_credentials')",Integer.class)).isEqualTo(34);
     }
 }

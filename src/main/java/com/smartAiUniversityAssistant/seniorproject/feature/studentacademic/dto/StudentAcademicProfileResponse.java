@@ -6,4 +6,5 @@ import java.time.LocalDate;
 public record StudentAcademicProfileResponse(Long studentId, String studentCode, String firstName, String lastName,
         String fullName, String universityEmail, String phoneNumber, LocalDate dateOfBirth,
         AcademicReferenceResponse faculty, AcademicReferenceResponse department, AcademicReferenceResponse program,
-        AcademicSemesterResponse semester, Integer academicYear, Integer enrollmentYear, String accountStatus) {}
+        AcademicSemesterResponse semester, Integer academicYear, Integer enrollmentYear, String accountStatus,
+        Integer studyYear, String degreeLevel) {}

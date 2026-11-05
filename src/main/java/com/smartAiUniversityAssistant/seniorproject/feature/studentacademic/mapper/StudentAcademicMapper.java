@@ -1,10 +1,13 @@
 package com.smartAiUniversityAssistant.seniorproject.feature.studentacademic.mapper;
 
 import com.smartAiUniversityAssistant.seniorproject.feature.course.enums.CourseType;
+import com.smartAiUniversityAssistant.seniorproject.feature.coursesection.entity.CourseSectionMeeting;
 import com.smartAiUniversityAssistant.seniorproject.feature.enrollment.entity.Enrollment;
 import com.smartAiUniversityAssistant.seniorproject.feature.semester.entity.Semester;
 import com.smartAiUniversityAssistant.seniorproject.feature.student.entity.Student;
 import com.smartAiUniversityAssistant.seniorproject.feature.studentacademic.dto.*;
+import java.time.DayOfWeek;
+import java.util.List;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -22,7 +25,7 @@ public class StudentAcademicMapper {
                 program == null ? null : new AcademicReferenceResponse(program.getId(), program.getProgramCode(),
                         program.getProgramName(), null),
                 semester(s.getSemester()), integer(s.getAcademicYear()), integer(s.getEnrollmentYear()),
-                s.getAccountStatus());
+                s.getAccountStatus(), integer(s.getStudyYear()), program == null ? null : program.getDegreeLevel());
     }
 
     // Course, Semester and Lecturer always come from the Enrollment's Course Section, never from the Student.
@@ -39,19 +42,25 @@ public class StudentAcademicMapper {
                 section.getRoom(), section.getSchedule());
     }
 
-    public StudentAcademicCourseResponse course(Enrollment e) {
+    public StudentAcademicCourseResponse course(Enrollment e, List<StudentCourseMeetingResponse> meetings) {
         var section = e.getCourseSection();
         var course = section.getCourse();
         var semester = section.getSemester();
+        var lecture = section.getLecture();
         return new StudentAcademicCourseResponse(course.getId(), course.getCourseCode(), course.getCourseName(),
                 course.getCreditHours(), course.getDescription(), integer(course.getCourseType()),
                 CourseType.fromCode(course.getCourseType()).getDisplayName(),
                 section.getId(), section.getSectionNumber(),
                 semester.getId(), semester.getAcademicYear(), semester.getSemesterNameEn(), semester.getSemesterNameTh(),
-                e.getStatus().name());
+                e.getStatus().name(), lecture.getId(), lecture.getLectureNameEn(), lecture.getLectureNameTh(), meetings);
     }
 
-    public StudentAcademicScheduleResponse schedule(Enrollment e) {
+    public StudentCourseMeetingResponse meeting(CourseSectionMeeting m) {
+        return new StudentCourseMeetingResponse(m.getMeetingType().name(), DayOfWeek.of(m.getDayOfWeek()).name(),
+                m.getStartTime(), m.getEndTime(), m.getEffectiveFrom(), m.getEffectiveTo(), m.getRoomLabel());
+    }
+
+    public StudentAcademicScheduleResponse schedule(Enrollment e, List<StudentCourseMeetingResponse> meetings) {
         var section = e.getCourseSection();
         var course = section.getCourse();
         var semester = section.getSemester();
@@ -60,7 +69,7 @@ public class StudentAcademicMapper {
                 course.getCourseName(), section.getId(), section.getSectionNumber(),
                 semester.getId(), semester.getAcademicYear(), semester.getSemesterNameEn(), semester.getSemesterNameTh(),
                 section.getSchedule(), section.getRoom(), lecture.getId(), lecture.getLectureNameEn(),
-                lecture.getLectureNameTh(), e.getStatus().name());
+                lecture.getLectureNameTh(), e.getStatus().name(), meetings);
     }
 
     public StudentAcademicLecturerResponse lecturer(Enrollment e) {

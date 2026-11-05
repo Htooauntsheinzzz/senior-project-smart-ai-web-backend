@@ -164,6 +164,9 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         positiveId(id);
         lockTimeout();
         Enrollment enrollment = locked(id);
+        // Soft-deleting would silently remove the result from the Student's CGPA and earned credits.
+        if (enrollments.hasCourseResult(id)) throw new EnrollmentFailure(409, "ENROLLMENT_HAS_COURSE_RESULT",
+                "An enrollment with a recorded course result cannot be deleted.");
         enrollment.setDeleted(true);
         enrollment.setUpdatedBy(actor.userId());
         enrollment.setUpdatedAt(now());

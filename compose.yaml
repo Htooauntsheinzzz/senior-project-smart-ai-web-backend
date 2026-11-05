@@ -118,6 +118,12 @@ services:
       AI_CONTEXT_MAX_TURNS: ${AI_CONTEXT_MAX_TURNS:-6}
       AI_CONTEXT_MAX_COURSE_REFERENCES: ${AI_CONTEXT_MAX_COURSE_REFERENCES:-20}
       AI_CONTEXT_MAX_BYTES: ${AI_CONTEXT_MAX_BYTES:-32768}
+      UNIVERSITY_TIMEZONE: ${UNIVERSITY_TIMEZONE:-Asia/Bangkok}
+      KNOWLEDGE_STORAGE_TYPE: ${KNOWLEDGE_STORAGE_TYPE:-local}
+      KNOWLEDGE_STORAGE_ROOT: /app/storage/academic-documents
+      KNOWLEDGE_MAX_FILE_SIZE_MB: ${KNOWLEDGE_MAX_FILE_SIZE_MB:-50}
+      KNOWLEDGE_UPLOAD_ENABLED: ${KNOWLEDGE_UPLOAD_ENABLED:-true}
+      KNOWLEDGE_STORAGE_DELETE_ORPHANS: ${KNOWLEDGE_STORAGE_DELETE_ORPHANS:-false}
       JWT_PRIVATE_KEY_PATH: /app/keys/private.pem
       JWT_PUBLIC_KEY_PATH: /app/keys/public.pem
       POSTGRES_HOST: postgres
@@ -133,6 +139,8 @@ services:
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     volumes:
+      # Uploaded knowledge documents survive container recreation; include this volume in backups.
+      - academic_document_storage:/app/storage/academic-documents
       - type: bind
         source: ${JWT_PRIVATE_KEY_PATH:?Set JWT_PRIVATE_KEY_PATH in .env}
         target: /app/keys/private.pem
@@ -155,3 +163,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  academic_document_storage:

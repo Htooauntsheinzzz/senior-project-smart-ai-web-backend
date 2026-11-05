@@ -1,5 +1,6 @@
 package com.smartAiUniversityAssistant.seniorproject.feature.studentacademic.service.impl;
 
+import com.smartAiUniversityAssistant.seniorproject.feature.coursesection.repository.CourseSectionMeetingRepository;
 import com.smartAiUniversityAssistant.seniorproject.feature.enrollment.entity.Enrollment;
 import com.smartAiUniversityAssistant.seniorproject.feature.enrollment.enums.EnrollmentStatus;
 import com.smartAiUniversityAssistant.seniorproject.feature.enrollment.repository.EnrollmentRepository;
@@ -11,7 +12,8 @@ import com.smartAiUniversityAssistant.seniorproject.feature.studentacademic.dto.
 import com.smartAiUniversityAssistant.seniorproject.feature.studentacademic.mapper.StudentAcademicMapper;
 import com.smartAiUniversityAssistant.seniorproject.feature.studentacademic.service.StudentAcademicService;
 import java.util.*;
-import java.util.function.Function;
+import java.util.function.*;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,13 +25,15 @@ public class StudentAcademicServiceImpl implements StudentAcademicService {
     private final StudentRepository students;
     private final StudentCredentialRepository credentials;
     private final EnrollmentRepository enrollments;
+    private final CourseSectionMeetingRepository meetings;
     private final StudentAcademicMapper mapper;
 
     public StudentAcademicServiceImpl(StudentRepository students, StudentCredentialRepository credentials,
-            EnrollmentRepository enrollments, StudentAcademicMapper mapper) {
+            EnrollmentRepository enrollments, CourseSectionMeetingRepository meetings, StudentAcademicMapper mapper) {
         this.students = students;
         this.credentials = credentials;
         this.enrollments = enrollments;
+        this.meetings = meetings;
         this.mapper = mapper;
     }
 
@@ -45,12 +49,12 @@ public class StudentAcademicServiceImpl implements StudentAcademicService {
 
     @Override @Transactional(readOnly = true, timeout = 15)
     public List<StudentAcademicCourseResponse> getCourses(long studentId, String status) {
-        return academicEnrollments(studentId, status, mapper::course);
+        return withMeetings(studentId, status, mapper::course);
     }
 
     @Override @Transactional(readOnly = true, timeout = 15)
     public List<StudentAcademicScheduleResponse> getSchedule(long studentId, String status) {
-        return academicEnrollments(studentId, status, mapper::schedule);
+        return withMeetings(studentId, status, mapper::schedule);
     }
 
     @Override @Transactional(readOnly = true, timeout = 15)
@@ -68,6 +72,19 @@ public class StudentAcademicServiceImpl implements StudentAcademicService {
         var statuses = parseStatuses(status);
         findCurrentActiveStudent(studentId);
         return enrollments.findStudentAcademicEnrollments(studentId, statuses).stream().map(view).toList();
+    }
+
+    // One extra query loads the meetings of every listed section at once.
+    private <T> List<T> withMeetings(long studentId, String status,
+            BiFunction<Enrollment, List<StudentCourseMeetingResponse>, T> view) {
+        var statuses = parseStatuses(status);
+        findCurrentActiveStudent(studentId);
+        List<Enrollment> rows = enrollments.findStudentAcademicEnrollments(studentId, statuses);
+        if (rows.isEmpty()) return List.of();
+        Map<Long, List<StudentCourseMeetingResponse>> bySection = new HashMap<>();
+        meetings.findActiveForSections(rows.stream().map(e -> e.getCourseSection().getId()).collect(Collectors.toSet()))
+                .forEach(m -> bySection.computeIfAbsent(m.getCourseSection().getId(), id -> new ArrayList<>()).add(mapper.meeting(m)));
+        return rows.stream().map(e -> view.apply(e, bySection.getOrDefault(e.getCourseSection().getId(), List.of()))).toList();
     }
 
     private Student findCurrentActiveStudent(long studentId) {

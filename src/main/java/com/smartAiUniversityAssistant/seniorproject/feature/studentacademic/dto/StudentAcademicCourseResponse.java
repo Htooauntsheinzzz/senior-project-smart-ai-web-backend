@@ -1,7 +1,10 @@
 package com.smartAiUniversityAssistant.seniorproject.feature.studentacademic.dto;
 
+import java.util.List;
+
 public record StudentAcademicCourseResponse(Long courseId, String courseCode, String courseName, Integer creditHours,
         String description, Integer courseType, String courseTypeName,
         Long courseSectionId, String sectionNumber,
         Long semesterId, Integer semesterAcademicYear, String semesterNameEn, String semesterNameTh,
-        String enrollmentStatus) {}
+        String enrollmentStatus,
+        Long lecturerId, String lecturerName, String lecturerNameTh, List<StudentCourseMeetingResponse> meetings) {}

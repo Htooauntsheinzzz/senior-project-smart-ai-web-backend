@@ -51,6 +51,9 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long>, J
     List<Enrollment> findStudentAcademicEnrollments(@Param("studentId") Long studentId,
             @Param("statuses") Collection<EnrollmentStatus> statuses);
 
+    @Query("select count(r) > 0 from StudentCourseResult r where r.enrollment.id = :id")
+    boolean hasCourseResult(@Param("id") Long id);
+
     interface StatusCount {
         EnrollmentStatus getStatus();
         long getTotal();

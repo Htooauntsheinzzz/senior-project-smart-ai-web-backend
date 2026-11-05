@@ -28,6 +28,7 @@ public class Student {
     @JoinColumn(name = "semester_id") private Semester semester;
     @Column(name = "academic_year") private Short academicYear;
     @Column(name = "enrollment_year") private Short enrollmentYear;
+    @Column(name = "study_year") private Short studyYear;
     @Column(name = "account_status", nullable = false, length = 30) private String accountStatus;
     @Column(name = "is_deleted", nullable = false) private boolean deleted;
     @Column(name = "created_by") private Long createdBy;

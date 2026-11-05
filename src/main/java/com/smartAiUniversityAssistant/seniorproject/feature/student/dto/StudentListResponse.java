@@ -8,5 +8,5 @@ public record StudentListResponse(Long id, String studentCode, String university
         Long departmentId, String departmentCode, String departmentName,
         Long programId, String programCode, String programName,
         Long semesterId, String semesterNameEn,
-        Integer academicYear, Integer enrollmentYear,
+        Integer academicYear, Integer enrollmentYear, Integer studyYear,
         String accountStatus, Instant createdAt, Instant updatedAt) {}
