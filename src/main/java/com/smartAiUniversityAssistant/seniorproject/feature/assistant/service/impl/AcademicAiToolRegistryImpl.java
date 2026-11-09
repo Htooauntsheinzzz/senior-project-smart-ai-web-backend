@@ -20,17 +20,18 @@ public class AcademicAiToolRegistryImpl implements AcademicAiToolRegistry {
                     + "faculty, department, program, current semester, academic year and enrollment year. Use it for "
                     + "profile questions and for \"What is my program / major / degree?\" (answer with programName)."),
             noArguments(GET_MY_ENROLLMENTS, "List the authenticated student's current (ACTIVE) enrollments with course, "
-                    + "section, semester, lecturer, room and schedule. Use it for questions about enrollments or the "
-                    + "sections the student is registered for; an empty list means no active enrollments."),
+                    + "section, semester, lecturer and `meetings`, the section's published timetable. Use it for questions "
+                    + "about enrollments or the sections the student is registered for; an empty list means no active enrollments."),
             noArguments(GET_MY_COURSES, "List the courses the authenticated student is currently taking, with credit "
                     + "hours, course type and section. Use it for \"What courses / subjects do I have?\"."),
             noArguments(GET_MY_SCHEDULE, "Get the authenticated student's current class schedule: for each course its "
-                    + "section, schedule text as stored, room and lecturer. Use it for timetable and \"when / where are "
-                    + "my classes\" questions; the text cannot tell which class is next or on a given date."),
+                    + "section, lecturer and `meetings`, the published timetable with weekday, start and end time, effective "
+                    + "dates, room number and building. Use it for timetable and \"when / where are my classes\" questions; "
+                    + "an empty `meetings` list means no published class times. It does not apply one-day cancellations."),
             course(GET_MY_COURSE_SECTION, "Get the authenticated student's own section of one course they are enrolled "
-                    + "in: section number, courseSectionId, room, schedule and lecturer. Use it for \"Which section am I "
-                    + "in for X?\", \"Where / what room is my X class?\", and to find the courseSectionId of the "
-                    + "student's own section before get_section_availability."),
+                    + "in: section number, courseSectionId, lecturer and `meetings` (published timetable with weekday, times, "
+                    + "room number and building). Use it for \"Which section am I in for X?\", \"Where / what room is my X "
+                    + "class?\", and to find the courseSectionId of the student's own section before get_section_availability."),
             course(GET_MY_COURSE_LECTURER, "Get the lecturer of the authenticated student's own section of one course "
                     + "they are enrolled in. Use it for \"Who teaches X?\" and \"Who is my lecturer for X?\"; other "
                     + "sections of the same course may have other lecturers."),

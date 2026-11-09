@@ -6,6 +6,7 @@ import com.smartAiUniversityAssistant.seniorproject.feature.enrollment.entity.En
 import com.smartAiUniversityAssistant.seniorproject.feature.semester.entity.Semester;
 import com.smartAiUniversityAssistant.seniorproject.feature.student.entity.Student;
 import com.smartAiUniversityAssistant.seniorproject.feature.studentacademic.dto.*;
+import com.smartAiUniversityAssistant.seniorproject.feature.timetable.entity.TimetableMeetingException;
 import java.time.DayOfWeek;
 import java.util.List;
 import org.springframework.stereotype.Component;
@@ -29,7 +30,7 @@ public class StudentAcademicMapper {
     }
 
     // Course, Semester and Lecturer always come from the Enrollment's Course Section, never from the Student.
-    public StudentAcademicEnrollmentResponse enrollment(Enrollment e) {
+    public StudentAcademicEnrollmentResponse enrollment(Enrollment e, List<StudentCourseMeetingResponse> meetings) {
         var section = e.getCourseSection();
         var course = section.getCourse();
         var semester = section.getSemester();
@@ -38,8 +39,7 @@ public class StudentAcademicMapper {
                 course.getId(), course.getCourseCode(), course.getCourseName(), course.getCreditHours(),
                 integer(course.getCourseType()), section.getId(), section.getSectionNumber(),
                 semester.getId(), semester.getAcademicYear(), semester.getSemesterNameEn(), semester.getSemesterNameTh(),
-                lecture.getId(), lecture.getLectureNameEn(), lecture.getLectureNameTh(),
-                section.getRoom(), section.getSchedule());
+                lecture.getId(), lecture.getLectureNameEn(), lecture.getLectureNameTh(), meetings);
     }
 
     public StudentAcademicCourseResponse course(Enrollment e, List<StudentCourseMeetingResponse> meetings) {
@@ -55,9 +55,22 @@ public class StudentAcademicMapper {
                 e.getStatus().name(), lecture.getId(), lecture.getLectureNameEn(), lecture.getLectureNameTh(), meetings);
     }
 
-    public StudentCourseMeetingResponse meeting(CourseSectionMeeting m) {
+    public StudentCourseMeetingResponse meeting(CourseSectionMeeting m, List<TimetableMeetingException> exceptions) {
+        var room = m.getRoom();
+        var building = room == null ? null : room.getBuilding();
         return new StudentCourseMeetingResponse(m.getMeetingType().name(), DayOfWeek.of(m.getDayOfWeek()).name(),
-                m.getStartTime(), m.getEndTime(), m.getEffectiveFrom(), m.getEffectiveTo(), m.getRoomLabel());
+                m.getStartTime(), m.getEndTime(), m.getEffectiveFrom(), m.getEffectiveTo(),
+                room == null ? m.getRoomLabel() : room.getRoomNumber(), m.getId(), m.getDayOfWeek().intValue(),
+                room == null ? null : room.getId(), room == null ? null : room.getRoomNumber(),
+                building == null ? null : building.getId(), building == null ? null : building.getBuildingName(),
+                building == null ? null : building.getSite().getId(), exceptions.stream().map(x -> exception(x, m)).toList());
+    }
+
+    public StudentMeetingExceptionResponse exception(TimetableMeetingException x, CourseSectionMeeting m) {
+        var room = x.getReplacementRoom() != null ? x.getReplacementRoom() : x.getReplacementDate() != null ? m.getRoom() : null;
+        return new StudentMeetingExceptionResponse(x.getOriginalDate(), x.getExceptionType().name(), x.getReplacementDate(),
+                x.getReplacementStartTime(), x.getReplacementEndTime(), room == null ? null : room.getId(),
+                room == null ? null : room.getRoomNumber(), room == null ? null : room.getBuilding().getBuildingName(), x.getReason());
     }
 
     public StudentAcademicScheduleResponse schedule(Enrollment e, List<StudentCourseMeetingResponse> meetings) {
@@ -68,7 +81,7 @@ public class StudentAcademicMapper {
         return new StudentAcademicScheduleResponse(e.getId(), course.getId(), course.getCourseCode(),
                 course.getCourseName(), section.getId(), section.getSectionNumber(),
                 semester.getId(), semester.getAcademicYear(), semester.getSemesterNameEn(), semester.getSemesterNameTh(),
-                section.getSchedule(), section.getRoom(), lecture.getId(), lecture.getLectureNameEn(),
+                lecture.getId(), lecture.getLectureNameEn(),
                 lecture.getLectureNameTh(), e.getStatus().name(), meetings);
     }
 

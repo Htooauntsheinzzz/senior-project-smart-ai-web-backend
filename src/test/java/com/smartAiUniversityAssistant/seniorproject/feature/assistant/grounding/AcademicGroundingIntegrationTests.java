@@ -1,5 +1,6 @@
 package com.smartAiUniversityAssistant.seniorproject.feature.assistant.grounding;
 
+import com.smartAiUniversityAssistant.seniorproject.feature.timetable.PublishedMeetingTestData;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.service.impl.StudentAssistantServiceImpl;
@@ -40,7 +41,7 @@ class AcademicGroundingIntegrationTests extends GroundingIntegrationSupport {
         tool("get_my_course_section", "courseIdentifier", "CSC460");
         answer("Your CSC460 class is in room 9-101.");
         assertThat(ask(A, "Where is my CSC460 class?")).contains("Your CSC460 classroom information is not currently available.")
-                .contains("Schedule: not currently available.").doesNotContain("9-101");
+                .doesNotContain("Timetable:").doesNotContain("9-101");
     }
 
     @Test
@@ -62,8 +63,9 @@ class AcademicGroundingIntegrationTests extends GroundingIntegrationSupport {
     void test11NextClassIsNotGuessedAndTheRecordedTimetableIsShown(CapturedOutput output) throws Exception {
         String answer = ask(A, "What is my next class?");
         assertThat(answer).startsWith("I can't reliably work out your next class")
-                .contains("Your recorded timetable:\n1. CS301 — Data Structures (section SEC-01): schedule Tuesday 09:00-11:45, room 11-402")
-                .contains("CSC460 — Cloud Computing (section SEC-01): schedule not currently available, room not currently available")
+                .contains("Your recorded timetable:\n1. CS301 — Data Structures (section SEC-01): Tuesday 09:00-11:45 (lecture) in room 11-402, "
+                        + PublishedMeetingTestData.BUILDING_NAME)
+                .contains("CSC460 — Cloud Computing (section SEC-01): timetable not currently available")
                 .doesNotContain("11-500");
         assertThat(sent).isEmpty();
         assertThat(output.getOut()).contains("groundingStatus=UNSUPPORTED").contains("grounding=UNSUPPORTED");

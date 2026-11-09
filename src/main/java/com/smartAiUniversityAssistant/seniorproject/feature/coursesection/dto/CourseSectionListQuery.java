@@ -9,7 +9,7 @@ public record CourseSectionListQuery(int page, int size, String search, Long cou
         String status, List<String> sort) {
     private static final Set<String> PARAMETERS = Set.of("page", "size", "search", "courseId", "semesterId",
             "lectureId", "status", "sort");
-    private static final Set<String> SORT_FIELDS = Set.of("id", "sectionNumber", "capacity", "status", "room",
+    private static final Set<String> SORT_FIELDS = Set.of("id", "sectionNumber", "capacity", "status",
             "createdAt", "updatedAt");
 
     public CourseSectionListQuery {

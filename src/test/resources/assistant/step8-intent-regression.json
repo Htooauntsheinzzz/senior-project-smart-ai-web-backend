@@ -517,14 +517,14 @@
       "requiresClarification": false,
       "expectedCoreFacts": {
         "contains": [
-          "Tuesday 09:00-11:45",
+          "\"dayOfWeek\":\"TUESDAY\",\"startTime\":\"09:00\",\"endTime\":\"11:45\"",
           "11-402",
-          "Friday 09:00-11:45",
+          "\"dayOfWeek\":\"FRIDAY\",\"startTime\":\"09:00\",\"endTime\":\"11:45\"",
           "5-201",
           "Dr. John Smith"
         ],
         "notContains": [
-          "Monday 13:00-15:45",
+          "\"dayOfWeek\":\"MONDAY\"",
           "11-500",
           "Dr. Jane Doe"
         ]
@@ -549,14 +549,14 @@
       "requiresClarification": false,
       "expectedCoreFacts": {
         "contains": [
-          "Tuesday 09:00-11:45",
+          "\"dayOfWeek\":\"TUESDAY\",\"startTime\":\"09:00\",\"endTime\":\"11:45\"",
           "11-402",
-          "Friday 09:00-11:45",
+          "\"dayOfWeek\":\"FRIDAY\",\"startTime\":\"09:00\",\"endTime\":\"11:45\"",
           "5-201",
           "Dr. John Smith"
         ],
         "notContains": [
-          "Monday 13:00-15:45",
+          "\"dayOfWeek\":\"MONDAY\"",
           "11-500",
           "Dr. Jane Doe"
         ]
@@ -581,14 +581,14 @@
       "requiresClarification": false,
       "expectedCoreFacts": {
         "contains": [
-          "Tuesday 09:00-11:45",
+          "\"dayOfWeek\":\"TUESDAY\",\"startTime\":\"09:00\",\"endTime\":\"11:45\"",
           "11-402",
-          "Friday 09:00-11:45",
+          "\"dayOfWeek\":\"FRIDAY\",\"startTime\":\"09:00\",\"endTime\":\"11:45\"",
           "5-201",
           "Dr. John Smith"
         ],
         "notContains": [
-          "Monday 13:00-15:45",
+          "\"dayOfWeek\":\"MONDAY\"",
           "11-500",
           "Dr. Jane Doe"
         ]
@@ -613,14 +613,14 @@
       "requiresClarification": false,
       "expectedCoreFacts": {
         "contains": [
-          "Tuesday 09:00-11:45",
+          "\"dayOfWeek\":\"TUESDAY\",\"startTime\":\"09:00\",\"endTime\":\"11:45\"",
           "11-402",
-          "Friday 09:00-11:45",
+          "\"dayOfWeek\":\"FRIDAY\",\"startTime\":\"09:00\",\"endTime\":\"11:45\"",
           "5-201",
           "Dr. John Smith"
         ],
         "notContains": [
-          "Monday 13:00-15:45",
+          "\"dayOfWeek\":\"MONDAY\"",
           "11-500",
           "Dr. Jane Doe"
         ]
@@ -645,14 +645,14 @@
       "requiresClarification": false,
       "expectedCoreFacts": {
         "contains": [
-          "Tuesday 09:00-11:45",
+          "\"dayOfWeek\":\"TUESDAY\",\"startTime\":\"09:00\",\"endTime\":\"11:45\"",
           "11-402",
-          "Friday 09:00-11:45",
+          "\"dayOfWeek\":\"FRIDAY\",\"startTime\":\"09:00\",\"endTime\":\"11:45\"",
           "5-201",
           "Dr. John Smith"
         ],
         "notContains": [
-          "Monday 13:00-15:45",
+          "\"dayOfWeek\":\"MONDAY\"",
           "11-500",
           "Dr. Jane Doe"
         ]
@@ -681,12 +681,12 @@
         "contains": [
           "\"courseCode\":\"CS301\"",
           "\"sectionNumber\":\"SEC-01\"",
-          "\"room\":\"11-402\"",
-          "Tuesday 09:00-11:45"
+          "\"roomNumber\":\"11-402\"",
+          "\"dayOfWeek\":\"TUESDAY\",\"startTime\":\"09:00\",\"endTime\":\"11:45\""
         ],
         "notContains": [
           "11-500",
-          "Monday 13:00-15:45",
+          "\"dayOfWeek\":\"MONDAY\"",
           "Dr. Jane Doe"
         ]
       }
@@ -714,12 +714,12 @@
         "contains": [
           "\"courseCode\":\"CS301\"",
           "\"sectionNumber\":\"SEC-01\"",
-          "\"room\":\"11-402\"",
-          "Tuesday 09:00-11:45"
+          "\"roomNumber\":\"11-402\"",
+          "\"dayOfWeek\":\"TUESDAY\",\"startTime\":\"09:00\",\"endTime\":\"11:45\""
         ],
         "notContains": [
           "11-500",
-          "Monday 13:00-15:45",
+          "\"dayOfWeek\":\"MONDAY\"",
           "Dr. Jane Doe"
         ]
       }
@@ -747,12 +747,12 @@
         "contains": [
           "\"courseCode\":\"CS301\"",
           "\"sectionNumber\":\"SEC-01\"",
-          "\"room\":\"11-402\"",
-          "Tuesday 09:00-11:45"
+          "\"roomNumber\":\"11-402\"",
+          "\"dayOfWeek\":\"TUESDAY\",\"startTime\":\"09:00\",\"endTime\":\"11:45\""
         ],
         "notContains": [
           "11-500",
-          "Monday 13:00-15:45",
+          "\"dayOfWeek\":\"MONDAY\"",
           "Dr. Jane Doe"
         ]
       }
@@ -780,12 +780,12 @@
         "contains": [
           "\"courseCode\":\"CS301\"",
           "\"sectionNumber\":\"SEC-01\"",
-          "\"room\":\"11-402\"",
-          "Tuesday 09:00-11:45"
+          "\"roomNumber\":\"11-402\"",
+          "\"dayOfWeek\":\"TUESDAY\",\"startTime\":\"09:00\",\"endTime\":\"11:45\""
         ],
         "notContains": [
           "11-500",
-          "Monday 13:00-15:45",
+          "\"dayOfWeek\":\"MONDAY\"",
           "Dr. Jane Doe"
         ]
       }
@@ -813,12 +813,12 @@
         "contains": [
           "\"courseCode\":\"CS301\"",
           "\"sectionNumber\":\"SEC-01\"",
-          "\"room\":\"11-402\"",
-          "Tuesday 09:00-11:45"
+          "\"roomNumber\":\"11-402\"",
+          "\"dayOfWeek\":\"TUESDAY\",\"startTime\":\"09:00\",\"endTime\":\"11:45\""
         ],
         "notContains": [
           "11-500",
-          "Monday 13:00-15:45",
+          "\"dayOfWeek\":\"MONDAY\"",
           "Dr. Jane Doe"
         ]
       }
@@ -846,7 +846,7 @@
         "contains": [
           "\"courseCode\":\"CSC452\"",
           "\"sectionNumber\":\"SEC-02\"",
-          "\"room\":\"5-201\""
+          "\"roomNumber\":\"5-201\""
         ],
         "notContains": [
           "11-402"
@@ -1971,8 +1971,7 @@
       ],
       "contains": [
         "\"courseCode\":\"CSC460\"",
-        "\"room\":null",
-        "\"schedule\":null"
+        "\"meetings\":[]"
       ]
     },
     {
@@ -2131,7 +2130,7 @@
       ],
       "notContains": [
         "11-500",
-        "Monday 13:00-15:45",
+        "\"dayOfWeek\":\"MONDAY\"",
         "Dr. Jane Doe"
       ]
     },
@@ -2153,11 +2152,11 @@
         }
       ],
       "contains": [
-        "Tuesday 09:00-11:45"
+        "\"dayOfWeek\":\"TUESDAY\",\"startTime\":\"09:00\",\"endTime\":\"11:45\""
       ],
       "notContains": [
         "11-500",
-        "Monday 13:00-15:45",
+        "\"dayOfWeek\":\"MONDAY\"",
         "Dr. Jane Doe"
       ]
     },
@@ -2234,8 +2233,8 @@
       "replyContains": [
         "can't reliably work out your next class",
         "Your recorded timetable:",
-        "CS301 — Data Structures (section SEC-01): schedule Tuesday 09:00-11:45, room 11-402",
-        "CSC460 — Cloud Computing (section SEC-01): schedule not currently available, room not currently available"
+        "CS301 — Data Structures (section SEC-01): Tuesday 09:00-11:45 (lecture) in room 11-402, Test Building",
+        "CSC460 — Cloud Computing (section SEC-01): timetable not currently available"
       ]
     },
     {

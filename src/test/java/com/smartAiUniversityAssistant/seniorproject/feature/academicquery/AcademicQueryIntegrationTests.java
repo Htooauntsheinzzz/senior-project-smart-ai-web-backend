@@ -8,6 +8,7 @@ import com.smartAiUniversityAssistant.seniorproject.feature.authentication.excep
 import com.smartAiUniversityAssistant.seniorproject.feature.course.exception.CourseNotFoundException;
 import com.smartAiUniversityAssistant.seniorproject.feature.coursesection.exception.CourseSectionNotFoundException;
 import com.smartAiUniversityAssistant.seniorproject.feature.student.exception.*;
+import com.smartAiUniversityAssistant.seniorproject.feature.timetable.PublishedMeetingTestData;
 import com.smartAiUniversityAssistant.seniorproject.security.*;
 import jakarta.persistence.EntityManagerFactory;
 import java.time.*;
@@ -176,8 +177,8 @@ class AcademicQueryIntegrationTests extends IntegrationSupport {
         assertThat(first.lecturerId()).isEqualTo(lectureA);
         assertThat(first.lecturerNameEn()).isEqualTo("Dr. John Smith");
         assertThat(first.lecturerNameTh()).isEqualTo("จอห์น");
-        assertThat(first.room()).isEqualTo("11-402");
-        assertThat(first.schedule()).isEqualTo("Tuesday 09:00-11:45");
+        assertThat(first.meetings()).extracting(AcademicMeetingQueryResult::roomNumber, AcademicMeetingQueryResult::dayOfWeek)
+                .containsExactly(tuple("11-402", "TUESDAY"));
 
         var courses = queries.getMyCourses();
         assertThat(courses).extracting(AcademicCourseQueryResult::courseCode).containsExactly("CS301", "CS302");
@@ -201,16 +202,16 @@ class AcademicQueryIntegrationTests extends IntegrationSupport {
         assertThat(schedule.getFirst().semesterId()).isEqualTo(semester1);
         assertThat(schedule.get(1).courseCode()).isEqualTo("CS302");
         assertThat(schedule.get(1).courseName()).isEqualTo("Operating Systems");
-        assertThat(schedule.getFirst().schedule()).isEqualTo("Tuesday 09:00-11:45");
-        assertThat(schedule.getFirst().room()).isEqualTo("11-402");
+        assertThat(schedule.getFirst().meetings()).extracting(AcademicMeetingQueryResult::roomNumber, AcademicMeetingQueryResult::dayOfWeek,
+                m -> m.startTime().toString(), m -> m.endTime().toString(), AcademicMeetingQueryResult::buildingName)
+                .containsExactly(tuple("11-402", "TUESDAY", "09:00", "11:45", PublishedMeetingTestData.BUILDING_NAME));
         assertThat(schedule.getFirst().lecturerId()).isEqualTo(lectureA);
         assertThat(schedule.getFirst().lecturerNameEn()).isEqualTo("Dr. John Smith");
         assertThat(schedule.getFirst().semesterNameEn()).isEqualTo("Semester 1");
         assertThat(schedule.getFirst().semesterNameTh()).isEqualTo("ภาคการศึกษาที่ 1");
         assertThat(schedule.getFirst().semesterAcademicYear()).isEqualTo(2026);
-        // Missing room and schedule stay null rather than being invented.
-        assertThat(schedule.get(1).room()).isNull();
-        assertThat(schedule.get(1).schedule()).isNull();
+        // A section without published meetings has an empty timetable rather than invented values.
+        assertThat(schedule.get(1).meetings()).isEmpty();
         assertThat(schedule.get(1).lecturerNameEn()).isEqualTo("Nittaya Chindakharn");
     }
 
@@ -228,8 +229,7 @@ class AcademicQueryIntegrationTests extends IntegrationSupport {
             assertThat(section.sectionNumber()).isEqualTo("SEC-01");
             assertThat(section.semesterId()).isEqualTo(semester1);
             assertThat(section.semesterAcademicYear()).isEqualTo(2026);
-            assertThat(section.room()).isEqualTo("11-402");
-            assertThat(section.schedule()).isEqualTo("Tuesday 09:00-11:45");
+            assertThat(section.meetings()).extracting(AcademicMeetingQueryResult::roomNumber).containsExactly("11-402");
             assertThat(section.lecturerId()).isEqualTo(lectureA);
             assertThat(section.enrollmentStatus()).isEqualTo("ACTIVE");
         }
@@ -486,8 +486,8 @@ class AcademicQueryIntegrationTests extends IntegrationSupport {
         assertThat(section.courseCode()).as("AQ-002").isEqualTo("CS301");
         assertThat(section.courseSectionId()).isEqualTo(sectionA1);
         assertThat(section.sectionNumber()).isEqualTo("SEC-01");
-        assertThat(section.room()).as("AQ-004").isEqualTo("11-402");
-        assertThat(section.schedule()).isEqualTo("Tuesday 09:00-11:45");
+        assertThat(section.meetings()).as("AQ-004").extracting(AcademicMeetingQueryResult::roomNumber, AcademicMeetingQueryResult::dayOfWeek)
+                .containsExactly(tuple("11-402", "TUESDAY"));
         assertThat(section.lecturerNameEn()).isEqualTo("Dr. John Smith");
 
         // AQ-003 "Who teaches CS301?" -> the lecturer of my own section, not Dr. Jane Doe's SEC-02.
@@ -500,8 +500,9 @@ class AcademicQueryIntegrationTests extends IntegrationSupport {
 
         // AQ-005 "What is my schedule?" -> getMySchedule()
         assertThat(queries.getMySchedule()).as("AQ-005")
-                .extracting(AcademicScheduleQueryResult::courseCode, AcademicScheduleQueryResult::schedule, AcademicScheduleQueryResult::room)
-                .containsExactly(tuple("CS301", "Tuesday 09:00-11:45", "11-402"), tuple("CSC452", "Friday 09:00-11:45", "5-201"));
+                .extracting(AcademicScheduleQueryResult::courseCode, s -> s.meetings().getFirst().dayOfWeek(),
+                        s -> s.meetings().getFirst().roomNumber())
+                .containsExactly(tuple("CS301", "TUESDAY", "11-402"), tuple("CSC452", "FRIDAY", "5-201"));
 
         // AQ-006 "How many credits is CS301?" -> getCourseInformation("CS301")
         var course = queries.getCourseInformation("CS301");
@@ -526,10 +527,8 @@ class AcademicQueryIntegrationTests extends IntegrationSupport {
         enroll(studentA, sectionA1, "ACTIVE", false);
         enroll(studentA, sectionB1, "ACTIVE", false);
         authenticateAs(studentA);
-        // Missing room and schedule come back as null rather than invented values.
-        var noRoom = queries.getMyCourseSection("CS302");
-        assertThat(noRoom.room()).isNull();
-        assertThat(noRoom.schedule()).isNull();
+        // A section without published meetings has an empty timetable rather than invented values.
+        assertThat(queries.getMyCourseSection("CS302").meetings()).isEmpty();
 
         // CLOSED only stops new enrollments; an existing ACTIVE enrollment is still the Student's class.
         db.update("UPDATE course_sections SET status='CLOSED' WHERE id=?", sectionB1);
@@ -563,7 +562,7 @@ class AcademicQueryIntegrationTests extends IntegrationSupport {
         long cs301 = enroll(studentA, sectionA1, "ACTIVE", false);
         long cs302 = enroll(studentA, sectionB1, "ACTIVE", false);
         authenticateAs(studentA);
-        assertThat(queries.getMyCourseSection("CS301").room()).isEqualTo("11-402");
+        assertThat(queries.getMyCourseSection("CS301").meetings()).extracting(AcademicMeetingQueryResult::roomNumber).containsExactly("11-402");
         assertThat(queries.getMyCourseLecturer("CS301").lecturerId()).isEqualTo(lectureA);
         assertThat(queries.getCourseInformation("CS301").creditHours()).isEqualTo(3);
         // The admin Course update validates prerequisites, which the SQL fixture never created.
@@ -573,9 +572,10 @@ class AcademicQueryIntegrationTests extends IntegrationSupport {
 
         admin(put("/api/v1/admin/course-sections/" + sectionA1).contentType(MediaType.APPLICATION_JSON)
                 .content(json.writeValueAsBytes(Map.of("courseId", courseA, "sectionNumber", "SEC-01", "capacity", 40,
-                        "lectureId", janeDoe, "room", "11-405", "schedule", "Tuesday 09:00-11:45",
+                        "lectureId", janeDoe,
                         "semesterId", semester1, "status", "ACTIVE"))), admin);
-        assertThat(queries.getMyCourseSection("CS301").room()).isEqualTo("11-405");
+        PublishedMeetingTestData.setRoom(db, sectionA1, "11-405");
+        assertThat(queries.getMyCourseSection("CS301").meetings()).extracting(AcademicMeetingQueryResult::roomNumber).containsExactly("11-405");
         assertThat(queries.getMyCourseLecturer("CS301").lecturerNameEn()).isEqualTo("Dr. Jane Doe");
 
         admin(put("/api/v1/admin/courses/" + courseA).contentType(MediaType.APPLICATION_JSON)
@@ -695,6 +695,7 @@ class AcademicQueryIntegrationTests extends IntegrationSupport {
         db.update("DELETE FROM student_credentials");
         db.update("DELETE FROM students");
         db.update("UPDATE app_users SET department_id=NULL,created_by=NULL,updated_by=NULL");
+        PublishedMeetingTestData.clean(db);
         db.update("DELETE FROM course_sections");
         db.update("DELETE FROM courses");
         db.update("DELETE FROM lectures");
@@ -718,10 +719,12 @@ class AcademicQueryIntegrationTests extends IntegrationSupport {
                 nameTh, nameEn, faculty, department, actorId);
     }
     private long section(long course, String number, long lecture, long semester, String room, String schedule, int capacity) {
-        return id("""
-                INSERT INTO course_sections(course_id,section_number,capacity,lecture_id,room,schedule,semester_id,status,created_by)
-                VALUES (?,?,?,?,?,?,?,'ACTIVE',?) RETURNING id
-                """, course, number, capacity, lecture, room, schedule, semester, actorId);
+        long id = id("""
+                INSERT INTO course_sections(course_id,section_number,capacity,lecture_id,semester_id,status,created_by)
+                VALUES (?,?,?,?,?,'ACTIVE',?) RETURNING id
+                """, course, number, capacity, lecture, semester, actorId);
+        PublishedMeetingTestData.publish(db, id, room, schedule);
+        return id;
     }
     private long student(String code, String first, String last) {
         long id = id("""

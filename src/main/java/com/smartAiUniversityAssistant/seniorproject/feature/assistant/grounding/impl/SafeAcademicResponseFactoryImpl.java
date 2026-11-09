@@ -156,17 +156,35 @@ public class SafeAcademicResponseFactoryImpl implements SafeAcademicResponseFact
     }
 
     private String scheduleLine(Map<?, ?> m) {
-        return title(m) + " (section " + orUnavailable(m.get("sectionNumber")) + "): schedule " + orUnavailable(m.get("schedule"))
-                + ", room " + orUnavailable(m.get("room"));
+        return title(m) + " (section " + orUnavailable(m.get("sectionNumber")) + "): " + meetings(m);
+    }
+
+    // Renders the published meetings of a section ("Monday 09:00-11:00 in room 11-405, Building A"), or says that the
+    // timetable is not available. Only structured timetable values are written; nothing is interpreted.
+    private static String meetings(Map<?, ?> m) {
+        if (!(m.get("meetings") instanceof List<?> rows) || rows.isEmpty()) return "timetable " + NOT_AVAILABLE;
+        var parts = new ArrayList<String>();
+        for (Object row : rows) {
+            if (!(row instanceof Map<?, ?> meeting)) continue;
+            String day = text(meeting.get("dayOfWeek"));
+            var part = new StringBuilder(day == null ? "day " + NOT_AVAILABLE : day.charAt(0) + day.substring(1).toLowerCase(Locale.ROOT));
+            part.append(' ').append(orUnavailable(meeting.get("startTime"))).append('-').append(orUnavailable(meeting.get("endTime")));
+            String type = text(meeting.get("meetingType"));
+            if (type != null) part.append(" (").append(type.toLowerCase(Locale.ROOT)).append(')');
+            String room = text(meeting.get("roomNumber"));
+            String building = text(meeting.get("buildingName"));
+            part.append(room == null ? ", room " + NOT_AVAILABLE : " in room " + room);
+            if (building != null) part.append(", ").append(building);
+            parts.add(part.toString());
+        }
+        return parts.isEmpty() ? "timetable " + NOT_AVAILABLE : String.join("; ", parts);
     }
 
     private String courseSection(Map<?, ?> m) {
         String code = text(m.get("courseCode"));
         var out = new StringBuilder("Your " + title(m) + " section is " + orUnavailable(m.get("sectionNumber")) + ".");
-        String room = text(m.get("room"));
-        out.append(room == null ? " " + roomUnavailable(code) : " Room: " + room + ".");
-        String schedule = text(m.get("schedule"));
-        out.append(schedule == null ? " Schedule: " + NOT_AVAILABLE + "." : " Schedule: " + schedule + ".");
+        // Rooms and class times come from the published timetable (spec 40); without meetings the classroom is unknown.
+        out.append(m.get("meetings") instanceof List<?> rows && !rows.isEmpty() ? " Timetable: " + meetings(m) + "." : " " + roomUnavailable(code));
         String lecturer = text(m.get("lecturerNameEn"));
         out.append(lecturer == null ? " " + lecturerUnavailable(code) : " Lecturer: " + lecturer + ".");
         return out.toString();

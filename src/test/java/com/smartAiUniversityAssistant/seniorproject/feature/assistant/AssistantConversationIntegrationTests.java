@@ -21,6 +21,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import com.smartAiUniversityAssistant.seniorproject.feature.timetable.PublishedMeetingTestData;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -168,7 +169,7 @@ class AssistantConversationIntegrationTests extends IntegrationSupport {
         assertThat(ok(chat(tokenA, id, "Who teaches the second one?")).get("message").stringValue())
                 .isEqualTo("CSC460: Dr. Jane Lee");
 
-        // CSC460 has no room: the null comes from PostgreSQL and is passed on, never invented.
+        // CSC460 has no published timetable: the empty list comes from PostgreSQL and is passed on, never invented.
         askAboutReferent(GET_MY_COURSE_SECTION, "room");
         assertThat(ok(chat(tokenA, id, "Where is it?")).get("message").stringValue()).isEqualTo("CSC460: not available");
 
@@ -193,7 +194,7 @@ class AssistantConversationIntegrationTests extends IntegrationSupport {
         String id = ok(chat(tokenA, null, "Where is my CS301 class?")).get("conversationId").stringValue();
         assertThat(stored(id).get("messages").get(1).get("content").stringValue()).isEqualTo("CS301: 11-402");
 
-        db.update("UPDATE course_sections SET room='11-405' WHERE id=?", fixture.placeholders().get("CS301_SEC01"));
+        PublishedMeetingTestData.setRoom(db, (Long) fixture.placeholders().get("CS301_SEC01"), "11-405");
         askAboutReferent(GET_MY_COURSE_SECTION, "room");
         assertThat(ok(chat(tokenA, id, "Where is it now?")).get("message").stringValue()).isEqualTo("CS301: 11-405");
         // The stored value only ever points at CS301; the room came from a new tool run.
@@ -394,7 +395,8 @@ class AssistantConversationIntegrationTests extends IntegrationSupport {
         var payload = (Map<?, ?>) r.toolRounds().getLast().results().getFirst().result();
         if (!Boolean.TRUE.equals(payload.get("success"))) return "That information is not available: " + payload.get("code");
         var data = (Map<?, ?>) payload.get("data");
-        Object value = data.get(field);
+        // The room now comes from the section's published timetable (first meeting), not from a section column.
+        Object value = "room".equals(field) ? PublishedMeetingTestData.room(data) : data.get(field);
         return data.get("courseCode") + ": " + (value == null ? "not available" : value);
     }
 

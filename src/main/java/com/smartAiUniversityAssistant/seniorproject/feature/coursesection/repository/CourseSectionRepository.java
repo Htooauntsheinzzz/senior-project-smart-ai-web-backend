@@ -10,9 +10,9 @@ import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
 public interface CourseSectionRepository extends JpaRepository<CourseSection, Long>, JpaSpecificationExecutor<CourseSection> {
-    @EntityGraph(attributePaths = {"course", "lecture", "semester"})
+    @EntityGraph(attributePaths = {"course", "lecture", "semester", "academicTerm"})
     Optional<CourseSection> findByIdAndDeletedFalse(Long id);
-    @Override @EntityGraph(attributePaths = {"course", "lecture", "semester"})
+    @Override @EntityGraph(attributePaths = {"course", "lecture", "semester", "academicTerm"})
     Page<CourseSection> findAll(Specification<CourseSection> specification, Pageable pageable);
     boolean existsByCourseIdAndSectionNumberAndSemesterIdAndIdNot(Long courseId, String sectionNumber, Long semesterId,
             Long id);

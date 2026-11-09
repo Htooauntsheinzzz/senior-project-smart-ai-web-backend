@@ -38,16 +38,16 @@ class AcademicMissingDataTests extends GroundingServiceTestSupport {
         when(toolExecutor.execute(any())).thenReturn(ok("get_my_course_section", section("CS301", "SEC-01", null, "Tuesday 09:00-11:45", "Dr. John Smith")));
         model(tools(call("get_my_course_section", "courseIdentifier", "CS301")), "Your class is in Room 11-402.");
         String answer = ask("Where is my CS301 class?");
-        assertThat(answer).contains("Your CS301 classroom information is not currently available.").doesNotContain("11-402");
+        assertThat(answer).contains("Tuesday 09:00-11:45 (lecture), room not currently available").doesNotContain("11-402");
     }
 
     @Test
     void missingScheduleIsReportedAsUnavailable() {
         when(toolExecutor.execute(any())).thenReturn(ok("get_my_schedule", List.of(map("courseCode", "CSC460", "courseName", "Cloud Computing",
-                "sectionNumber", "SEC-01", "schedule", null, "room", null, "lecturerNameEn", "Dr. Jane Lee"))));
+                "sectionNumber", "SEC-01", "meetings", List.of(), "lecturerNameEn", "Dr. Jane Lee"))));
         model(tools(call("get_my_schedule")), "CSC460 meets on Monday 08:00-10:00 in 7-101.");
         assertThat(ask("What is my schedule?")).isEqualTo("Your recorded timetable:\n1. CSC460 — Cloud Computing (section SEC-01): "
-                + "schedule not currently available, room not currently available").doesNotContain("Monday").doesNotContain("7-101");
+                + "timetable not currently available").doesNotContain("Monday").doesNotContain("7-101");
     }
 
     @Test

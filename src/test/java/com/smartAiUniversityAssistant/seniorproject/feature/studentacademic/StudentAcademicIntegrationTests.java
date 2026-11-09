@@ -5,6 +5,7 @@ import com.smartAiUniversityAssistant.seniorproject.feature.enrollment.exception
 import com.smartAiUniversityAssistant.seniorproject.feature.enrollment.repository.EnrollmentRepository;
 import com.smartAiUniversityAssistant.seniorproject.feature.student.exception.*;
 import com.smartAiUniversityAssistant.seniorproject.feature.studentacademic.service.StudentAcademicService;
+import com.smartAiUniversityAssistant.seniorproject.feature.timetable.PublishedMeetingTestData;
 import jakarta.persistence.EntityManagerFactory;
 import java.time.*;
 import java.util.*;
@@ -178,8 +179,11 @@ class StudentAcademicIntegrationTests extends IntegrationSupport {
                 .andExpect(jsonPath("$[0].semesterNameTh").value("ภาคการศึกษาที่ 1"))
                 .andExpect(jsonPath("$[0].lecturerId").value(lectureA))
                 .andExpect(jsonPath("$[0].lecturerNameEn").value("Dr. John Smith"))
-                .andExpect(jsonPath("$[0].room").value("11-402"))
-                .andExpect(jsonPath("$[0].schedule").value("Tuesday 09:00-11:45"));
+                .andExpect(jsonPath("$[0].room").doesNotExist())
+                .andExpect(jsonPath("$[0].schedule").doesNotExist())
+                .andExpect(jsonPath("$[0].meetings.length()").value(1))
+                .andExpect(jsonPath("$[0].meetings[0].dayOfWeek").value("TUESDAY"))
+                .andExpect(jsonPath("$[0].meetings[0].roomName").value("11-402"));
         assertThat(ids(get(token, "/enrollments?status=pending"))).containsExactly(pending);
         assertThat(ids(get(token, "/enrollments?status= Withdrawn "))).containsExactly(withdrawn);
         // The Semester comes from the Course Section, not from the Student's own semester (semester1).
@@ -229,14 +233,20 @@ class StudentAcademicIntegrationTests extends IntegrationSupport {
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].enrollmentId").value(active))
-                .andExpect(jsonPath("$[0].schedule").value("Tuesday 09:00-11:45"))
-                .andExpect(jsonPath("$[0].room").value("11-402"))
+                .andExpect(jsonPath("$[0].schedule").doesNotExist())
+                .andExpect(jsonPath("$[0].room").doesNotExist())
+                .andExpect(jsonPath("$[0].meetings[0].dayOfWeek").value("TUESDAY"))
+                .andExpect(jsonPath("$[0].meetings[0].startTime").value("09:00"))
+                .andExpect(jsonPath("$[0].meetings[0].endTime").value("11:45"))
+                .andExpect(jsonPath("$[0].meetings[0].roomName").value("11-402"))
+                .andExpect(jsonPath("$[0].meetings[0].buildingName").value(PublishedMeetingTestData.BUILDING_NAME))
                 .andExpect(jsonPath("$[0].lecturerId").value(lectureA))
                 .andExpect(jsonPath("$[0].lecturerNameEn").value("Dr. John Smith"))
                 .andExpect(jsonPath("$[0].semesterNameEn").value("Semester 1"))
                 .andExpect(jsonPath("$[0].enrollmentStatus").value("ACTIVE"))
                 .andExpect(jsonPath("$[1].enrollmentId").value(other))
-                .andExpect(jsonPath("$[1].schedule").value("Mon 13:00-16:00"));
+                .andExpect(jsonPath("$[1].meetings[0].dayOfWeek").value("MONDAY"))
+                .andExpect(jsonPath("$[1].meetings[0].startTime").value("13:00"));
 
         get(token, "/lecturers").andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
@@ -363,8 +373,9 @@ class StudentAcademicIntegrationTests extends IntegrationSupport {
             statistics.clear();
             assertThat(academics.getEnrollments(studentA, "ACTIVE")).hasSize(10);
             assertThat(academics.getLecturers(studentA, "ACTIVE")).hasSize(10);
-            // Per call: Student (with placement), credential check, enrollments with every relationship.
-            assertThat(statistics.getPrepareStatementCount()).isLessThanOrEqualTo(6);
+            // Per call: Student (with placement), credential check, enrollments with every relationship; the enrollment
+            // view adds the published meetings of all sections and their exceptions in two more queries (spec 40).
+            assertThat(statistics.getPrepareStatementCount()).isLessThanOrEqualTo(8);
         } finally {
             statistics.setStatisticsEnabled(false);
         }
@@ -375,6 +386,7 @@ class StudentAcademicIntegrationTests extends IntegrationSupport {
         db.update("DELETE FROM student_credentials");
         db.update("DELETE FROM students");
         db.update("UPDATE app_users SET department_id=NULL,created_by=NULL,updated_by=NULL");
+        PublishedMeetingTestData.clean(db);
         db.update("DELETE FROM course_sections");
         db.update("DELETE FROM courses");
         db.update("DELETE FROM lectures");
@@ -394,10 +406,12 @@ class StudentAcademicIntegrationTests extends IntegrationSupport {
                 """, code, name, code + " description", faculty, department, type, actorId);
     }
     private long section(long course, String number, long lecture, long semester, String room, String schedule) {
-        return id("""
-                INSERT INTO course_sections(course_id,section_number,capacity,lecture_id,room,schedule,semester_id,status,created_by)
-                VALUES (?,?,40,?,?,?,?,'ACTIVE',?) RETURNING id
-                """, course, number, lecture, room, schedule, semester, actorId);
+        long id = id("""
+                INSERT INTO course_sections(course_id,section_number,capacity,lecture_id,semester_id,status,created_by)
+                VALUES (?,?,40,?,?,'ACTIVE',?) RETURNING id
+                """, course, number, lecture, semester, actorId);
+        PublishedMeetingTestData.publish(db, id, room, schedule);
+        return id;
     }
     private long student(String code, String first, String last, String status, boolean credential) {
         long id = id("""

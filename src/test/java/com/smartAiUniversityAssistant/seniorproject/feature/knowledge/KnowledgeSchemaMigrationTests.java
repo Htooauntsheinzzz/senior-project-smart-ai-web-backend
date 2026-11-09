@@ -22,7 +22,7 @@ class KnowledgeSchemaMigrationTests extends IntegrationSupport {
         schema = "knowledge_" + UUID.randomUUID().toString().replace("-", "");
         flyway = Flyway.configure().dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
                 .defaultSchema(schema).schemas(schema).cleanDisabled(false).load();
-        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(39);
+        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(44);
         var dataSource = new DriverManagerDataSource(POSTGRES.getJdbcUrl() + "&currentSchema=" + schema,
                 POSTGRES.getUsername(), POSTGRES.getPassword());
         db = new JdbcTemplate(dataSource);

@@ -3,6 +3,7 @@ package com.smartAiUniversityAssistant.seniorproject.feature.assistant.grounding
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.service.impl.StudentAssistantServiceImpl;
+import com.smartAiUniversityAssistant.seniorproject.feature.timetable.PublishedMeetingTestData;
 import java.util.*;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
@@ -34,12 +35,12 @@ class AcademicConversationGroundingTests extends GroundingIntegrationSupport {
         answer("Your CS301 class is in room 11-402.");
         String id = chat(A, null, "Where is my CS301 class?").get("conversationId").stringValue();
 
-        db.update("UPDATE course_sections SET room='11-405' WHERE id=?", fixture.placeholders().get("CS301_SEC01"));
+        PublishedMeetingTestData.setRoom(db, (Long) fixture.placeholders().get("CS301_SEC01"), "11-405");
         toolForReferent("get_my_course_section");
         answer("It is still in room 11-402.");
         String now = chat(A, id, "Where is it now?").get("message").stringValue();
 
-        assertThat(now).contains("Room: 11-405.").doesNotContain("11-402");
+        assertThat(now).contains("in room 11-405").doesNotContain("11-402");
         // The old answer was in the history the model saw, but only the fresh result counted as evidence.
         assertThat(sent.getLast().history()).extracting(m -> m.content()).contains("Your CS301 class is in room 11-402.");
         assertThat(stored(id).get("messages").get(3).get("content").stringValue()).isEqualTo(now);
@@ -50,9 +51,9 @@ class AcademicConversationGroundingTests extends GroundingIntegrationSupport {
         tool("get_my_course_section", "courseIdentifier", "CS301");
         answer("Your CS301 class is in room 11-402.");
         String id = chat(A, null, "Where is my CS301 class?").get("conversationId").stringValue();
-        db.update("UPDATE course_sections SET room='11-405' WHERE id=?", fixture.placeholders().get("CS301_SEC01"));
+        PublishedMeetingTestData.setRoom(db, (Long) fixture.placeholders().get("CS301_SEC01"), "11-405");
         toolForReferent("get_my_course_section");
-        answer(r -> "The current room for CS301 is " + ((Map<?, ?>) lastData(r)).get("room") + ".");
+        answer(r -> "The current room for CS301 is " + PublishedMeetingTestData.room((Map<?, ?>) lastData(r)) + ".");
         assertThat(chat(A, id, "Where is it now?").get("message").stringValue()).isEqualTo("The current room for CS301 is 11-405.");
     }
 
@@ -106,7 +107,7 @@ class AcademicConversationGroundingTests extends GroundingIntegrationSupport {
         answer(r -> ((Map<?, ?>) lastData(r)).get("courseCode") + " is taught by " + ((Map<?, ?>) lastData(r)).get("lecturerNameEn") + ".");
         assertThat(chat(A, id, "Who teaches the first one?").get("message").stringValue()).isEqualTo("CS301 is taught by Dr. John Smith.");
         toolForReferent("get_my_course_section");
-        answer(r -> ((Map<?, ?>) lastData(r)).get("courseCode") + " is in room " + ((Map<?, ?>) lastData(r)).get("room") + ".");
+        answer(r -> ((Map<?, ?>) lastData(r)).get("courseCode") + " is in room " + PublishedMeetingTestData.room((Map<?, ?>) lastData(r)) + ".");
         assertThat(chat(A, id, "Where is it?").get("message").stringValue()).isEqualTo("CS301 is in room 11-402.");
     }
 }

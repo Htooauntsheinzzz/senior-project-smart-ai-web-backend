@@ -29,7 +29,7 @@ public class AcademicAiToolResultMapper {
                 "semesterNameEn", r.semesterNameEn(), "semesterNameTh", r.semesterNameTh(),
                 "semesterAcademicYear", r.semesterAcademicYear(),
                 "lecturerNameEn", r.lecturerNameEn(), "lecturerNameTh", r.lecturerNameTh(),
-                "room", r.room(), "schedule", r.schedule());
+                "meetings", meetings(r.meetings()));
     }
 
     public Map<String, Object> course(AcademicCourseQueryResult r) {
@@ -45,18 +45,28 @@ public class AcademicAiToolResultMapper {
                 "courseSectionId", r.courseSectionId(), "sectionNumber", r.sectionNumber(),
                 "semesterNameEn", r.semesterNameEn(), "semesterNameTh", r.semesterNameTh(),
                 "semesterAcademicYear", r.semesterAcademicYear(),
-                "schedule", r.schedule(), "room", r.room(),
-                "lecturerNameEn", r.lecturerNameEn(), "lecturerNameTh", r.lecturerNameTh());
+                "lecturerNameEn", r.lecturerNameEn(), "lecturerNameTh", r.lecturerNameTh(),
+                "meetings", meetings(r.meetings()));
     }
+
+    // The published timetable (spec 40) is the only source of class times and rooms; sections carry no free text.
+    private static List<Map<String, Object>> meetings(List<AcademicMeetingQueryResult> meetings) {
+        return meetings == null ? List.of() : meetings.stream().map(m -> fields("meetingType", m.meetingType(),
+                "dayOfWeek", m.dayOfWeek(), "startTime", time(m.startTime()), "endTime", time(m.endTime()),
+                "effectiveFrom", text(m.effectiveFrom()), "effectiveTo", text(m.effectiveTo()),
+                "roomNumber", m.roomNumber(), "buildingName", m.buildingName())).toList();
+    }
+
+    private static String time(java.time.LocalTime value) { return value == null ? null : value.toString(); }
+    private static String text(Object value) { return value == null ? null : value.toString(); }
 
     public Map<String, Object> courseSection(AcademicCourseSectionQueryResult r) {
         return fields("courseCode", r.courseCode(), "courseName", r.courseName(),
                 "courseSectionId", r.courseSectionId(), "sectionNumber", r.sectionNumber(),
                 "semesterNameEn", r.semesterNameEn(), "semesterNameTh", r.semesterNameTh(),
                 "semesterAcademicYear", r.semesterAcademicYear(),
-                "room", r.room(), "schedule", r.schedule(),
                 "lecturerNameEn", r.lecturerNameEn(), "lecturerNameTh", r.lecturerNameTh(),
-                "enrollmentStatus", r.enrollmentStatus());
+                "enrollmentStatus", r.enrollmentStatus(), "meetings", meetings(r.meetings()));
     }
 
     public Map<String, Object> lecturer(AcademicLecturerQueryResult r) {

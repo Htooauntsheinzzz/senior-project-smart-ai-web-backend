@@ -7,6 +7,6 @@ public record CourseSectionResponse(Long id,
         Long courseId, String courseCode, String courseName,
         String sectionNumber, Integer capacity, long enrolledCount, @JsonProperty("isFull") boolean isFull,
         Long lectureId, String lectureNameTh, String lectureNameEn, String lectureNickname,
-        String room, String schedule,
         Long semesterId, String semesterNameTh, String semesterNameEn,
+        Long academicTermId, String academicYearCode, String academicYearLabel,
         String status, Long createdBy, Instant createdAt, Long updatedBy, Instant updatedAt) {}

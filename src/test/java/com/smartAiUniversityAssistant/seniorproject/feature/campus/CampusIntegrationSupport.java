@@ -54,9 +54,9 @@ public abstract class CampusIntegrationSupport extends IntegrationSupport {
         db.update("UPDATE app_users SET department_id=NULL,created_by=NULL,updated_by=NULL");
         // The database is shared with the other test classes, so clear whatever they left that references users.
         for (String table : List.of("student_course_result_audits", "student_course_results", "grade_definitions", "grading_schemes",
-                "course_exams", "course_assignments", "course_section_meetings", "academic_document_processing", "academic_document_files",
+                "course_exams", "course_assignments", "timetable_meeting_exceptions", "course_section_meetings", "academic_document_processing", "academic_document_files",
                 "academic_documents", "document_categories", "curriculum_versions", "student_credentials", "enrollments", "students",
-                "course_sections", "courses", "lectures", "semesters", "programs", "departments", "faculties"))
+                "course_sections", "academic_terms", "courses", "lectures", "semesters", "programs", "departments", "faculties"))
             db.update("DELETE FROM " + table);
         db.update("DELETE FROM app_user_roles");
         db.update("DELETE FROM appuser_credentials");

@@ -248,7 +248,8 @@ public class GroundedAnswerValidatorImpl implements GroundedAnswerValidator {
             String text = String.valueOf(value);
             if ("creditHours".equals(key) && value instanceof Number n) credits.add(n.longValue());
             if (key != null && SEAT_FIELDS.contains(key) && value instanceof Number n) seats.add(n.longValue());
-            if ("room".equals(key)) rooms.addAll(roomsOf(text));
+            // "room" is kept for older evidence; published meetings carry roomNumber (spec 40).
+            if ("room".equals(key) || "roomNumber".equals(key)) rooms.addAll(roomsOf(text));
             if ("courseSectionId".equals(key) && value instanceof Number n) sections.add(n.longValue());
             if ("sectionNumber".equals(key)) {
                 Matcher digits = Pattern.compile("(\\d{1,6})").matcher(text);

@@ -5,6 +5,7 @@ import com.smartAiUniversityAssistant.seniorproject.feature.course.entity.Course
 import com.smartAiUniversityAssistant.seniorproject.feature.course.enums.CourseType;
 import com.smartAiUniversityAssistant.seniorproject.feature.coursesection.entity.CourseSection;
 import com.smartAiUniversityAssistant.seniorproject.feature.studentacademic.dto.*;
+import java.util.List;
 import org.springframework.stereotype.Component;
 
 // Structured values only: the assistant writes the natural-language answer, never this mapper.
@@ -31,7 +32,7 @@ public class AcademicQueryMapper {
         return new AcademicEnrollmentQueryResult(e.enrollmentId(), e.enrollmentStatus(), e.enrollmentDate(),
                 e.courseId(), e.courseCode(), e.courseName(), e.creditHours(), e.courseSectionId(), e.sectionNumber(),
                 e.semesterId(), e.semesterAcademicYear(), e.semesterNameEn(), e.semesterNameTh(),
-                e.lecturerId(), e.lecturerNameEn(), e.lecturerNameTh(), e.room(), e.schedule());
+                e.lecturerId(), e.lecturerNameEn(), e.lecturerNameTh(), meetings(e.meetings()));
     }
 
     public AcademicCourseQueryResult toCourseResult(StudentAcademicCourseResponse c) {
@@ -43,14 +44,20 @@ public class AcademicQueryMapper {
     public AcademicScheduleQueryResult toScheduleResult(StudentAcademicScheduleResponse s) {
         return new AcademicScheduleQueryResult(s.courseId(), s.courseCode(), s.courseName(), s.courseSectionId(),
                 s.sectionNumber(), s.semesterId(), s.semesterAcademicYear(), s.semesterNameEn(), s.semesterNameTh(),
-                s.schedule(), s.room(), s.lecturerId(), s.lecturerNameEn(), s.lecturerNameTh());
+                s.lecturerId(), s.lecturerNameEn(), s.lecturerNameTh(), meetings(s.meetings()));
+    }
+
+    // Published weekly meetings (spec 40) replace the former free-text room and schedule of a section.
+    private static List<AcademicMeetingQueryResult> meetings(List<StudentCourseMeetingResponse> meetings) {
+        return meetings == null ? List.of() : meetings.stream().map(m -> new AcademicMeetingQueryResult(m.meetingType(),
+                m.dayOfWeek(), m.startTime(), m.endTime(), m.effectiveFrom(), m.effectiveTo(), m.roomName(), m.buildingName())).toList();
     }
 
     public AcademicCourseSectionQueryResult toSectionResult(StudentAcademicEnrollmentResponse e) {
         return new AcademicCourseSectionQueryResult(e.courseId(), e.courseCode(), e.courseName(),
                 e.courseSectionId(), e.sectionNumber(),
                 e.semesterId(), e.semesterAcademicYear(), e.semesterNameEn(), e.semesterNameTh(),
-                e.room(), e.schedule(), e.lecturerId(), e.lecturerNameEn(), e.lecturerNameTh(), e.enrollmentStatus());
+                e.lecturerId(), e.lecturerNameEn(), e.lecturerNameTh(), e.enrollmentStatus(), meetings(e.meetings()));
     }
 
     public AcademicLecturerQueryResult toLecturerResult(StudentAcademicLecturerResponse l) {

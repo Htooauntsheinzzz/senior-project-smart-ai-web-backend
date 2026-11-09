@@ -12,8 +12,10 @@ import com.smartAiUniversityAssistant.seniorproject.feature.assistant.service.im
 import com.smartAiUniversityAssistant.seniorproject.feature.course.exception.CourseNotFoundException;
 import com.smartAiUniversityAssistant.seniorproject.feature.coursesection.exception.CourseSectionNotFoundException;
 import com.smartAiUniversityAssistant.seniorproject.feature.student.exception.StudentAccountNotActiveException;
+import com.smartAiUniversityAssistant.seniorproject.feature.timetable.PublishedMeetingTestData;
 import java.math.BigInteger;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.*;
 import org.junit.jupiter.api.*;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -105,22 +107,25 @@ class AcademicAiToolExecutorTests {
     void listToolsMapToTheirServiceMethodsAndKeepOnlyTheNeededFields() {
         when(academicQuery.getMyEnrollments()).thenReturn(List.of(new AcademicEnrollmentQueryResult(900L, "ACTIVE",
                 LocalDate.of(2026, 8, 15), 10L, "CS301", "Data Structures", 3, 15L, "SEC-01", 4L, 2026, "Semester 1", "ภาค 1",
-                7L, "Dr. John Smith", "จอห์น", "11-402", "Tuesday 09:00-11:45")));
+                7L, "Dr. John Smith", "จอห์น", List.of(meeting("11-402")))));
         when(academicQuery.getMyCourses()).thenReturn(List.of(new AcademicCourseQueryResult(10L, "CS301", "Data Structures", 3,
                 "desc", 1, "CORE", 15L, "SEC-01", 4L, 2026, "Semester 1", "ภาค 1")));
         when(academicQuery.getMySchedule()).thenReturn(List.of(new AcademicScheduleQueryResult(10L, "CS301", "Data Structures",
-                15L, "SEC-01", 4L, 2026, "Semester 1", "ภาค 1", null, null, 7L, "Dr. John Smith", "จอห์น")));
+                15L, "SEC-01", 4L, 2026, "Semester 1", "ภาค 1", 7L, "Dr. John Smith", "จอห์น", List.of())));
 
         AcademicAiToolResult enrollments = run("get_my_enrollments", Map.of());
         assertThat(enrollments.resultCount()).isEqualTo(1);
         assertThat(first(enrollments)).containsEntry("courseCode", "CS301").containsEntry("sectionNumber", "SEC-01")
-                .containsEntry("enrollmentStatus", "ACTIVE").containsEntry("courseSectionId", 15L).containsEntry("room", "11-402")
-                .doesNotContainKeys("enrollmentId", "courseId", "semesterId", "lecturerId", "studentId", "enrollmentDate");
+                .containsEntry("enrollmentStatus", "ACTIVE").containsEntry("courseSectionId", 15L)
+                .doesNotContainKeys("enrollmentId", "courseId", "semesterId", "lecturerId", "studentId", "enrollmentDate", "room", "schedule");
+        @SuppressWarnings("unchecked") var meeting = (Map<String, Object>) ((List<?>) first(enrollments).get("meetings")).getFirst();
+        assertThat(meeting).containsEntry("roomNumber", "11-402").containsEntry("dayOfWeek", "TUESDAY").containsEntry("startTime", "09:00")
+                .containsEntry("endTime", "11:45").containsEntry("buildingName", "Test Building").containsEntry("effectiveFrom", "2026-01-05");
         assertThat(first(run("get_my_courses", Map.of()))).containsEntry("creditHours", 3).containsEntry("courseTypeName", "CORE")
                 .doesNotContainKeys("courseId", "courseType", "semesterId");
-        // Null schedule and room are preserved as null, not dropped or replaced.
-        assertThat(first(run("get_my_schedule", Map.of()))).containsEntry("schedule", null).containsEntry("room", null)
-                .containsKey("schedule").doesNotContainKeys("lecturerId", "courseId");
+        // A section without published meetings keeps an empty list; nothing is invented in its place.
+        assertThat(first(run("get_my_schedule", Map.of()))).containsEntry("meetings", List.of())
+                .doesNotContainKeys("schedule", "room", "lecturerId", "courseId");
 
         verify(academicQuery).getMyEnrollments();
         verify(academicQuery).getMyCourses();
@@ -139,15 +144,16 @@ class AcademicAiToolExecutorTests {
     @Test
     void courseToolsMapToTheirServiceMethodsWithTheTrimmedIdentifier() {
         when(academicQuery.getMyCourseSection("CS301")).thenReturn(new AcademicCourseSectionQueryResult(10L, "CS301",
-                "Data Structures", 15L, "SEC-01", 4L, 2026, "Semester 1", "ภาค 1", "11-402", "Tuesday 09:00-11:45", 7L,
-                "Dr. John Smith", "จอห์น", "ACTIVE"));
+                "Data Structures", 15L, "SEC-01", 4L, 2026, "Semester 1", "ภาค 1", 7L,
+                "Dr. John Smith", "จอห์น", "ACTIVE", List.of(meeting("11-402"))));
         when(academicQuery.getMyCourseLecturer("CS301")).thenReturn(new AcademicLecturerQueryResult(7L, null, null, null,
                 10L, "CS301", "Data Structures", 15L, "SEC-01", 4L, 2026, "Semester 1", "ภาค 1"));
         when(academicQuery.getCourseInformation("CS301")).thenReturn(new CourseInformationQueryResult(10L, "CS301",
                 "Data Structures", 3, "desc", 1, "CORE", "CS201", 40, 2, true, 1L, "IT", "IT", "ไอที", 2L, "CS", "CS", null, null, null));
 
-        assertThat(data(run("get_my_course_section", course("  CS301 ")))).containsEntry("room", "11-402")
-                .containsEntry("courseSectionId", 15L).doesNotContainKeys("courseId", "lecturerId");
+        var section = data(run("get_my_course_section", course("  CS301 ")));
+        assertThat(section).containsEntry("courseSectionId", 15L).doesNotContainKeys("courseId", "lecturerId", "room", "schedule");
+        assertThat(PublishedMeetingTestData.room(section)).isEqualTo("11-402");
         // A missing lecturer stays null so the model cannot be handed a made-up name.
         assertThat(data(run("get_my_course_lecturer", course("CS301")))).containsEntry("lecturerNameEn", null)
                 .containsKey("lecturerNameEn").doesNotContainKey("lecturerId");
@@ -198,7 +204,7 @@ class AcademicAiToolExecutorTests {
         });
         // Exactly 100 characters is still accepted.
         when(academicQuery.getMyCourseSection("C".repeat(100))).thenReturn(new AcademicCourseSectionQueryResult(10L, "CS301",
-                "Data Structures", 15L, "SEC-01", 4L, 2026, "Semester 1", "ภาค 1", null, null, 7L, null, null, "ACTIVE"));
+                "Data Structures", 15L, "SEC-01", 4L, 2026, "Semester 1", "ภาค 1", 7L, null, null, "ACTIVE", List.of()));
         assertThat(run("get_my_course_section", course("C".repeat(100))).success()).isTrue();
         verify(academicQuery).getMyCourseSection("C".repeat(100));
         verifyNoMoreInteractions(academicQuery);
@@ -237,6 +243,11 @@ class AcademicAiToolExecutorTests {
     }
 
     @SuppressWarnings("unchecked")
+    private static AcademicMeetingQueryResult meeting(String room) {
+        return new AcademicMeetingQueryResult("LECTURE", "TUESDAY", LocalTime.of(9, 0), LocalTime.of(11, 45),
+                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 12, 25), room, "Test Building");
+    }
+
     private static Map<String, Object> data(AcademicAiToolResult result) {
         assertThat(result.success()).as(String.valueOf(result.errorCode())).isTrue();
         return (Map<String, Object>) result.data();

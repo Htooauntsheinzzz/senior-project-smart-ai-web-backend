@@ -93,6 +93,8 @@ public class SecurityConfig {
                                 "/api/v1/admin/curriculums","/api/v1/admin/curriculums/**",
                                 "/api/v1/admin/assignments","/api/v1/admin/assignments/**",
                                 "/api/v1/admin/exams","/api/v1/admin/exams/**",
+                                "/api/v1/admin/academic-terms","/api/v1/admin/academic-terms/**",
+                                "/api/v1/admin/timetable/**",
                                 "/api/v1/admin/knowledge/**").access((auth,context) -> {
                             var current=auth.get();
                             restricted.requireFull(current);

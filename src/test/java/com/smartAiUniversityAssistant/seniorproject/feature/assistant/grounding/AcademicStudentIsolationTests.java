@@ -3,24 +3,33 @@ package com.smartAiUniversityAssistant.seniorproject.feature.assistant.grounding
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.*;
+import com.smartAiUniversityAssistant.seniorproject.feature.timetable.PublishedMeetingTestData;
 import org.junit.jupiter.api.Test;
 
 /** Spec §14, §42, §55, §61: only the token's Student's facts, never another Student's or another request's. */
 class AcademicStudentIsolationTests extends GroundingIntegrationSupport {
     private static final String A = "STD-TEST-001", B = "STD-TEST-002";
 
-    // An honest model: repeats each schedule row the tool returned.
+    // An honest model: repeats each schedule row the tool returned, from its published meetings.
     private void scheduleAnswer() {
         tool("get_my_schedule");
         answer(r -> {
             var lines = new ArrayList<String>();
             for (Object row : (List<?>) lastData(r)) {
                 var m = (Map<?, ?>) row;
-                lines.add(m.get("courseCode") + ": " + (m.get("schedule") == null ? "schedule not available" : m.get("schedule"))
-                        + ", room " + (m.get("room") == null ? "not available" : m.get("room")));
+                var meetings = (List<?>) m.get("meetings");
+                lines.add(m.get("courseCode") + ": " + (meetings.isEmpty() ? "timetable not available" : meetings.stream()
+                        .map(x -> (Map<?, ?>) x).map(x -> day(x.get("dayOfWeek")) + " " + x.get("startTime") + "-" + x.get("endTime")
+                                + ", room " + (x.get("roomNumber") == null ? "not available" : x.get("roomNumber")))
+                        .collect(java.util.stream.Collectors.joining("; "))));
             }
             return String.join("\n", lines);
         });
+    }
+
+    private static String day(Object dayOfWeek) {
+        String d = String.valueOf(dayOfWeek);
+        return d.charAt(0) + d.substring(1).toLowerCase(Locale.ROOT);
     }
 
     @Test
@@ -50,8 +59,8 @@ class AcademicStudentIsolationTests extends GroundingIntegrationSupport {
         tool("get_my_course_section", "courseIdentifier", "CS301");
         answer("You are in CS301 SEC-01 with Dr. John Smith in room 11-402.");
         String answer = ask(B, "Which section am I in for CS301?");
-        assertThat(answer).isEqualTo("Your CS301 — Data Structures section is SEC-02. Room: 11-500. Schedule: Monday 13:00-15:45. "
-                + "Lecturer: Dr. Jane Doe.");
+        assertThat(answer).isEqualTo("Your CS301 — Data Structures section is SEC-02. Timetable: Monday 13:00-15:45 (lecture) in room 11-500, "
+                + PublishedMeetingTestData.BUILDING_NAME + ". Lecturer: Dr. Jane Doe.");
         // The backend queried Student B's own enrollment: SEC-01's lecturer and room never reached the model.
         assertThat(sent.getLast().toolRounds().getFirst().results().getFirst().result().toString())
                 .contains("SEC-02").doesNotContain("SEC-01").doesNotContain("John Smith").doesNotContain("11-402");

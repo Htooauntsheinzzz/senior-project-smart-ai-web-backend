@@ -45,7 +45,7 @@ class SafeAcademicResponseFactoryTests {
                 verified("get_my_course_section", section("CS301", "SEC-01", null, null, "Dr. John Smith"))));
         assertThat(answer).isEqualTo("Your CS301 — Data Structures section SEC-01 is taught by Dr. John Smith.\n\n"
                 + "Your CS301 — Data Structures section is SEC-01. Your CS301 classroom information is not currently available. "
-                + "Schedule: not currently available. Lecturer: Dr. John Smith.");
+                + "Lecturer: Dr. John Smith.");
     }
 
     @Test
@@ -63,9 +63,12 @@ class SafeAcademicResponseFactoryTests {
                 .isEqualTo("Your current enrollments:\n1. CS301 — Data Structures (section SEC-01, 3 credit hours, ACTIVE)\n"
                         + "2. CSC452 — Mobile Programming (section SEC-02, 3 credit hours, ACTIVE)");
         assertThat(responses.groundedAnswer(List.of(verified("get_my_schedule", List.of(map("courseCode", "CSC460",
-                "courseName", "Cloud Computing", "sectionNumber", "SEC-01", "schedule", null, "room", null))))))
-                .isEqualTo("Your recorded timetable:\n1. CSC460 — Cloud Computing (section SEC-01): schedule not currently available, "
-                        + "room not currently available");
+                "courseName", "Cloud Computing", "sectionNumber", "SEC-01", "meetings", List.of()))))))
+                .isEqualTo("Your recorded timetable:\n1. CSC460 — Cloud Computing (section SEC-01): timetable not currently available");
+        assertThat(responses.groundedAnswer(List.of(verified("get_my_schedule", List.of(map("courseCode", "CS301",
+                "courseName", "Data Structures", "sectionNumber", "SEC-01", "meetings", meetings("11-402", "Tuesday 09:00-11:45")))))))
+                .isEqualTo("Your recorded timetable:\n1. CS301 — Data Structures (section SEC-01): Tuesday 09:00-11:45 (lecture) "
+                        + "in room 11-402, Test Building");
         assertThat(responses.groundedAnswer(List.of(verified("get_my_courses", List.of())))).isEqualTo(responses.enrollmentUnavailable());
     }
 

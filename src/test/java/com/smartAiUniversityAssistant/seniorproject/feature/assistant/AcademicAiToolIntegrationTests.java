@@ -3,6 +3,7 @@ package com.smartAiUniversityAssistant.seniorproject.feature.assistant;
 import com.smartAiUniversityAssistant.seniorproject.IntegrationSupport;
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.dto.*;
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.service.LlmClient;
+import com.smartAiUniversityAssistant.seniorproject.feature.timetable.PublishedMeetingTestData;
 import java.time.Instant;
 import java.util.*;
 import java.util.function.Function;
@@ -172,8 +173,9 @@ class AcademicAiToolIntegrationTests extends IntegrationSupport {
 
         LlmRequest last = sentRequests(3).get(2);
         @SuppressWarnings("unchecked") var section = (Map<String, Object>) resultOf(last, 0, 0).get("data");
-        assertThat(section).containsEntry("sectionNumber", "SEC-01").containsEntry("room", "11-402")
+        assertThat(section).containsEntry("sectionNumber", "SEC-01").doesNotContainKeys("room", "schedule")
                 .containsEntry("lecturerNameEn", "Dr. John Smith").containsEntry("courseSectionId", sectionCs301A);
+        assertThat(PublishedMeetingTestData.room(section)).isEqualTo("11-402");
         @SuppressWarnings("unchecked") var seats = (Map<String, Object>) resultOf(last, 1, 0).get("data");
         // 1 ACTIVE + 2 PENDING hold seats; WITHDRAWN does not.
         assertThat(seats).containsEntry("capacity", 40).containsEntry("occupiedSeats", 3L).containsEntry("availableSeats", 37L)
@@ -226,17 +228,21 @@ class AcademicAiToolIntegrationTests extends IntegrationSupport {
     void answersFollowTheDatabaseOnTheNextRequestAfterAnAcademicChange() throws Exception {
         script(tools(call("c1", "get_my_course_section", Map.of("courseIdentifier", "CS301"))), answer("Room answer."));
         chat(login("STD-TEST-001"), "Where is my CS301 class?").andExpect(status().isOk());
-        assertThat(resultData(sentRequests(2).get(1))).containsEntry("room", "11-402").containsEntry("lecturerNameEn", "Dr. John Smith");
+        var before = resultData(sentRequests(2).get(1));
+        assertThat(before).containsEntry("lecturerNameEn", "Dr. John Smith");
+        assertThat(PublishedMeetingTestData.room(before)).isEqualTo("11-402");
 
-        // The same change an admin makes through the Course Section update: a new room and a new lecturer.
+        // The same changes an admin makes: a new lecturer on the Course Section and a new room on the timetable.
         long newLecturer = lecturer("ใหม่", "Dr. New Lecturer");
-        db.update("UPDATE course_sections SET room='11-405', lecture_id=?, schedule=NULL WHERE id=?", newLecturer, sectionCs301A);
+        db.update("UPDATE course_sections SET lecture_id=? WHERE id=?", newLecturer, sectionCs301A);
+        PublishedMeetingTestData.setRoom(db, sectionCs301A, "11-405");
         clearInvocations(llm);
 
         chat(login("STD-TEST-001"), "Where is my CS301 class?").andExpect(status().isOk());
-        // No cache or hard-coded data between requests: the second chat reads the updated row, and null stays null.
-        assertThat(resultData(sentRequests(2).get(1))).containsEntry("room", "11-405")
-                .containsEntry("lecturerNameEn", "Dr. New Lecturer").containsEntry("schedule", null);
+        // No cache or hard-coded data between requests: the second chat reads the updated rows.
+        var after = resultData(sentRequests(2).get(1));
+        assertThat(after).containsEntry("lecturerNameEn", "Dr. New Lecturer").doesNotContainKeys("room", "schedule");
+        assertThat(PublishedMeetingTestData.room(after)).isEqualTo("11-405");
     }
 
     @Test
@@ -274,6 +280,7 @@ class AcademicAiToolIntegrationTests extends IntegrationSupport {
         db.update("DELETE FROM student_credentials");
         db.update("DELETE FROM students");
         db.update("UPDATE app_users SET department_id=NULL,created_by=NULL,updated_by=NULL");
+        PublishedMeetingTestData.clean(db);
         db.update("DELETE FROM course_sections");
         db.update("DELETE FROM courses");
         db.update("DELETE FROM lectures");
@@ -296,10 +303,12 @@ class AcademicAiToolIntegrationTests extends IntegrationSupport {
                 nameTh, nameEn, faculty, department, actorId);
     }
     private long section(long course, String number, long lecture, long semester, String room, String schedule, int capacity) {
-        return id("""
-                INSERT INTO course_sections(course_id,section_number,capacity,lecture_id,room,schedule,semester_id,status,created_by)
-                VALUES (?,?,?,?,?,?,?,'ACTIVE',?) RETURNING id
-                """, course, number, capacity, lecture, room, schedule, semester, actorId);
+        long id = id("""
+                INSERT INTO course_sections(course_id,section_number,capacity,lecture_id,semester_id,status,created_by)
+                VALUES (?,?,?,?,?,'ACTIVE',?) RETURNING id
+                """, course, number, capacity, lecture, semester, actorId);
+        PublishedMeetingTestData.publish(db, id, room, schedule);
+        return id;
     }
     private long student(String code, String hash) {
         long id = id("""

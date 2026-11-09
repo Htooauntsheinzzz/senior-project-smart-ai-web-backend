@@ -1,5 +1,6 @@
 package com.smartAiUniversityAssistant.seniorproject.feature.enrollment;
 
+import com.smartAiUniversityAssistant.seniorproject.feature.timetable.PublishedMeetingTestData;
 import com.smartAiUniversityAssistant.seniorproject.IntegrationSupport;
 import com.smartAiUniversityAssistant.seniorproject.feature.enrollment.dto.*;
 import com.smartAiUniversityAssistant.seniorproject.feature.enrollment.service.EnrollmentService;
@@ -62,6 +63,7 @@ class EnrollmentIntegrationTests extends IntegrationSupport {
         db.update("DELETE FROM student_credentials");
         db.update("DELETE FROM students");
         db.update("UPDATE app_users SET department_id=NULL,created_by=NULL,updated_by=NULL");
+        PublishedMeetingTestData.clean(db);
         db.update("DELETE FROM course_sections");
         db.update("DELETE FROM courses");
         db.update("DELETE FROM lectures");
@@ -123,7 +125,6 @@ class EnrollmentIntegrationTests extends IntegrationSupport {
                 .andExpect(jsonPath("semesterNameTh").value("ภาคการศึกษาที่ 1"))
                 .andExpect(jsonPath("lectureId").value(lecture))
                 .andExpect(jsonPath("lectureNameEn").value("Nittaya Chindakharn"))
-                .andExpect(jsonPath("room").value("IT-101"))
                 .andExpect(jsonPath("capacity").value(2))
                 .andExpect(jsonPath("enrolledCount").value(1))
                 .andExpect(jsonPath("isFull").value(false))
@@ -467,10 +468,12 @@ class EnrollmentIntegrationTests extends IntegrationSupport {
                 Long.class, nameTh, nameEn, actorId);
     }
     private long section(long course, String number, int capacity, long semester, String status) {
-        return db.queryForObject("""
-                INSERT INTO course_sections(course_id,section_number,capacity,lecture_id,room,schedule,semester_id,status,created_by)
-                VALUES (?,?,?,?,'IT-101','Mon 09:00-12:00',?,?,?) RETURNING id
+        long id = db.queryForObject("""
+                INSERT INTO course_sections(course_id,section_number,capacity,lecture_id,semester_id,status,created_by)
+                VALUES (?,?,?,?,?,?,?) RETURNING id
                 """, Long.class, course, number, capacity, lecture, semester, status, actorId);
+        PublishedMeetingTestData.publish(db, id, "IT-101", "Mon 09:00-12:00");
+        return id;
     }
     private long student(String code, String first, String last, String status) {
         return db.queryForObject("""

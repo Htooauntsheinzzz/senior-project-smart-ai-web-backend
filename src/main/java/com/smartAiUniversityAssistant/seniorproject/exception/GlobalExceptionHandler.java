@@ -95,6 +95,11 @@ public class GlobalExceptionHandler {
             HttpServletRequest req,HttpServletResponse res) throws IOException {
         writer.write(req,res,e.status(),e.code(),e.getMessage());
     }
+    @ExceptionHandler(com.smartAiUniversityAssistant.seniorproject.feature.timetable.exception.TimetableFailure.class)
+    void timetable(com.smartAiUniversityAssistant.seniorproject.feature.timetable.exception.TimetableFailure e,
+            HttpServletRequest req,HttpServletResponse res) throws IOException {
+        writer.write(req,res,e.status(),e.code(),e.getMessage());
+    }
     @ExceptionHandler(AuthenticationFailure.class)
     void authentication(AuthenticationFailure e,HttpServletRequest req,HttpServletResponse res) throws IOException {
         writer.write(req,res,e.status(),e.code(),e.getMessage());

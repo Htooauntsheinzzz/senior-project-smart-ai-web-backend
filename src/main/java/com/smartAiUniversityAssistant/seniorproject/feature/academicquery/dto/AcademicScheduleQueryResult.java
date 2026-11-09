@@ -1,7 +1,10 @@
 package com.smartAiUniversityAssistant.seniorproject.feature.academicquery.dto;
 
-// schedule is the Course Section's free-text value, returned as stored without interpretation.
+import java.util.List;
+
+// meetings is the published timetable of the section; there is no free-text schedule any more.
 public record AcademicScheduleQueryResult(Long courseId, String courseCode, String courseName,
         Long courseSectionId, String sectionNumber,
         Long semesterId, Integer semesterAcademicYear, String semesterNameEn, String semesterNameTh,
-        String schedule, String room, Long lecturerId, String lecturerNameEn, String lecturerNameTh) {}
+        Long lecturerId, String lecturerNameEn, String lecturerNameTh,
+        List<AcademicMeetingQueryResult> meetings) {}

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.smartAiUniversityAssistant.seniorproject.feature.academicquery.dto.*;
 import com.smartAiUniversityAssistant.seniorproject.feature.academicquery.service.AcademicQueryService;
 import com.smartAiUniversityAssistant.seniorproject.feature.academicquery.service.impl.AcademicQueryServiceImpl;
+import com.smartAiUniversityAssistant.seniorproject.feature.timetable.PublishedMeetingTestData;
 import java.nio.file.*;
 import java.time.Instant;
 import java.util.*;
@@ -135,8 +136,8 @@ class GroundingEvaluationTests extends IntentEvaluationSupport {
     // login rate limit (shared Redis) would then reject later test classes.
     private void restore() {
         Object section = fixture.placeholders().get("CS301_SEC01");
-        db.update("UPDATE course_sections SET room='11-402', lecture_id=(SELECT id FROM lectures WHERE lecture_name_en='Dr. John Smith') "
-                + "WHERE id=?", section);
+        db.update("UPDATE course_sections SET lecture_id=(SELECT id FROM lectures WHERE lecture_name_en='Dr. John Smith') WHERE id=?", section);
+        PublishedMeetingTestData.setRoom(db, (Long) section, "11-402");
         db.update("UPDATE enrollments SET status='ACTIVE' WHERE student_id=? AND course_section_id=?", fixture.studentA(), section);
         db.update("UPDATE courses SET description='Linear and non-linear data structures' WHERE course_code='CS301'");
     }
@@ -146,8 +147,8 @@ class GroundingEvaluationTests extends IntentEvaluationSupport {
         Object section = fixture.placeholders().get("CS301_SEC01");
         for (String mutation : mutations) {
             switch (mutation) {
-                case "CS301_SEC01_ROOM_11_405" -> db.update("UPDATE course_sections SET room='11-405' WHERE id=?", section);
-                case "CS301_SEC01_ROOM_NULL" -> db.update("UPDATE course_sections SET room=NULL WHERE id=?", section);
+                case "CS301_SEC01_ROOM_11_405" -> PublishedMeetingTestData.setRoom(db, (Long) section, "11-405");
+                case "CS301_SEC01_ROOM_NULL" -> PublishedMeetingTestData.setRoom(db, (Long) section, null);
                 case "CS301_SEC01_LECTURER_LEE" -> db.update(
                         "UPDATE course_sections SET lecture_id=(SELECT id FROM lectures WHERE lecture_name_en='Dr. Jane Lee') WHERE id=?", section);
                 case "DROP_A_CS301" -> db.update("UPDATE enrollments SET status='DROPPED' WHERE student_id=? AND course_section_id=?",

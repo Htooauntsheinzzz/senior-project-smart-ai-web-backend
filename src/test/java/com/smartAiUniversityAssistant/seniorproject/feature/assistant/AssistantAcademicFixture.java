@@ -1,5 +1,6 @@
 package com.smartAiUniversityAssistant.seniorproject.feature.assistant;
 
+import com.smartAiUniversityAssistant.seniorproject.feature.timetable.PublishedMeetingTestData;
 import java.util.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -7,7 +8,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 /**
  * The synthetic academic data shared by the Step 8 regression tests and the Step 9 evaluation (Testcontainers only,
  * never a Flyway migration). Student A (STD-TEST-001, Computer Science): CS301 SEC-01 (Dr. John Smith, 11-402,
- * Tuesday 09:00-11:45), CSC452 SEC-02 (Dr. Jane Lee, 5-201, Friday 09:00-11:45), CSC460 SEC-01 (no room or schedule),
+ * Tuesday 09:00-11:45), CSC452 SEC-02 (Dr. Jane Lee, 5-201, Friday 09:00-11:45), CSC460 SEC-01 (no published timetable),
  * CSC453 DROPPED. Student B (STD-TEST-002, Information Systems): CS301 SEC-02 (Dr. Jane Doe, 11-500), CSC452 SEC-02,
  * CSC453 SEC-01. Student C (STD-TEST-003) has no enrollments. CS301 SEC-01 holds 3 of 40 seats (1 ACTIVE + 2 PENDING),
  * CSC470 SEC-01 is full (2 of 2), CSC470 SEC-02 is CLOSED, DEL100 is deleted, OLD200 inactive, CSC499 has no section.
@@ -115,6 +116,7 @@ public final class AssistantAcademicFixture {
         db.update("DELETE FROM student_credentials");
         db.update("DELETE FROM students");
         db.update("UPDATE app_users SET department_id=NULL,created_by=NULL,updated_by=NULL");
+        PublishedMeetingTestData.clean(db);
         db.update("DELETE FROM course_sections");
         db.update("DELETE FROM courses");
         db.update("DELETE FROM lectures");
@@ -140,10 +142,12 @@ public final class AssistantAcademicFixture {
     }
     private long section(long course, String number, long lecture, long semester, String room, String schedule, int capacity,
             String status) {
-        return id("""
-                INSERT INTO course_sections(course_id,section_number,capacity,lecture_id,room,schedule,semester_id,status,created_by)
-                VALUES (?,?,?,?,?,?,?,?,?) RETURNING id
-                """, course, number, capacity, lecture, room, schedule, semester, status, actorId);
+        long id = id("""
+                INSERT INTO course_sections(course_id,section_number,capacity,lecture_id,semester_id,status,created_by)
+                VALUES (?,?,?,?,?,?,?) RETURNING id
+                """, course, number, capacity, lecture, semester, status, actorId);
+        PublishedMeetingTestData.publish(db, id, room, schedule);
+        return id;
     }
     private long student(String code, String hash) {
         long id = id("""

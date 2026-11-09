@@ -41,6 +41,7 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
     private long actor, faculty, department, program, lecturerA, lecturerB, current, past;
     private long courseA, courseB, courseC, sectionA, sectionB, sectionC, sectionAPast, sectionOther;
     private long studentA, studentB, scheme, gradeA, gradeB, gradeF, gradeP, gradeI, gradeW;
+    private long site, building, room1103, roomLab;
     private String hash;
 
     @BeforeEach
@@ -62,6 +63,13 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
         lecturerB = id("INSERT INTO lectures(lecture_name_th,lecture_name_en,faculty_id,department_id,created_by) VALUES ('บี','Lecturer B',?,?,?) RETURNING id", faculty, department, actor);
         past = id("INSERT INTO semesters(academic_year,semester_name_th,semester_name_en,created_by) VALUES (2025,'เทอม 1','Semester 1',?) RETURNING id", actor);
         current = id("INSERT INTO semesters(academic_year,semester_name_th,semester_name_en,created_by) VALUES (2026,'เทอม 1','Semester 1',?) RETURNING id", actor);
+        // Spec file 42: sections need an academic term and published meetings need a campus room.
+        term(past, "2568", "2025-08-01", "2025-12-31");
+        term(current, "2569", "2026-08-01", "2027-05-31");
+        site = id("INSERT INTO campus_sites(site_code,site_name) VALUES ('MAIN','Main Campus') RETURNING id");
+        building = id("INSERT INTO campus_buildings(site_id,building_code,building_name,total_floors) VALUES (?,'B11','Building 11',12) RETURNING id", site);
+        room1103 = room("1103");
+        roomLab = room("Lab 1108");
         courseA = course("CSC-452", "Mobile Programming", 3);
         courseB = course("CSC-311", "Data Structures", 1);
         courseC = course("CSC-999", "Other Course", 3);
@@ -304,7 +312,7 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
         // Adjacent is fine, overlapping is not.
         post(admin, base, meetingBody("TUTORIAL", 1, "11:45", "12:30")).andExpect(status().isCreated());
         post(admin, base, meetingBody("LAB", 1, "11:00", "12:00")).andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("COURSE_SECTION_MEETING_CONFLICT"));
+                .andExpect(jsonPath("$.code").value("TIMETABLE_SECTION_CONFLICT"));
         post(admin, base, meetingBody("LAB", 2, "11:00", "10:00")).andExpect(status().isBadRequest());
         post(admin, base, meetingBody("LAB", 8, "09:00", "10:00")).andExpect(status().isBadRequest());
         post(admin, base, meetingBody("SEMINAR", 2, "09:00", "10:00")).andExpect(status().isBadRequest());
@@ -312,14 +320,21 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
         badDates.put("effectiveTo", "2026-01-01");
         post(admin, base, badDates).andExpect(status().isBadRequest());
         var room = new HashMap<>(meetingBody("LAB", 2, "09:00", "10:00"));
-        room.put("roomId", 5);
-        post(admin, base, room).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("ROOM_NOT_FOUND"));
+        room.put("roomId", 999999);
+        post(admin, base, room).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("TIMETABLE_ROOM_NOT_FOUND"));
+        // Publishing (the legacy default) needs a campus room; a label alone is not a location.
+        var labelOnly = new HashMap<>(meetingBody("LAB", 2, "09:00", "10:00"));
+        labelOnly.remove("roomId");
+        post(admin, base, labelOnly).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("TIMETABLE_PUBLISH_NOT_ALLOWED"));
+        labelOnly.put("active", false);
+        post(admin, base, labelOnly).andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("DRAFT"))
+                .andExpect(jsonPath("$.active").value(false)).andExpect(jsonPath("$.roomLabel").value("1103"));
         post(admin, "/api/v1/admin/course-sections/999999/meetings", meetingBody("LAB", 2, "09:00", "10:00")).andExpect(status().isNotFound());
         put(admin, base + "/" + lecture, meetingBody("LECTURE", 1, "08:00", "09:00")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.startTime").value("08:00"));
-        get(admin, base).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(3));
+        get(admin, base).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(4));
         mvc.perform(auth(delete(base + "/" + lecture), admin)).andExpect(status().isNoContent());
-        get(admin, base).andExpect(jsonPath("$.length()").value(2));
+        get(admin, base).andExpect(jsonPath("$.length()").value(3));
         assertThat(db.queryForObject("SELECT is_deleted FROM course_section_meetings WHERE id=?", Boolean.class, lecture)).isTrue();
         put(admin, "/api/v1/admin/course-sections/" + sectionB + "/meetings/" + lecture, meetingBody("LECTURE", 1, "08:00", "09:00"))
                 .andExpect(status().isNotFound());
@@ -343,10 +358,12 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
                 .andExpect(jsonPath("$[0].meetings[0].startTime").value("09:00"))
                 .andExpect(jsonPath("$[0].meetings[0].endTime").value("11:45"))
                 .andExpect(jsonPath("$[0].meetings[0].roomName").value("1103"))
+                .andExpect(jsonPath("$[0].meetings[0].dayOfWeekNumber").value(1))
+                .andExpect(jsonPath("$[0].meetings[0].buildingName").value("Building 11"))
+                .andExpect(jsonPath("$[0].meetings[0].roomId").value(room1103))
                 .andExpect(jsonPath("$[0].meetings[1].meetingType").value("LECTURE"))
                 .andExpect(jsonPath("$[0].meetings[1].roomName").value("Lab 1108"));
         get(token, ACADEMIC + "/schedule").andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].schedule").value("Mon/Tues 02:00-4:00"))
                 .andExpect(jsonPath("$[0].meetings.length()").value(2));
     }
 
@@ -378,7 +395,7 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
         enroll(studentA, sectionA, "ACTIVE");
         enroll(studentA, sectionB, "ACTIVE");
         meeting(sectionA, 1, "09:00", "11:45", "2026-08-01", "2026-12-31", "1103", true);
-        meeting(sectionB, 5, "13:00", "14:00", "2026-08-01", "2026-12-31", null, true);
+        meeting(sectionB, 5, "13:00", "14:00", "2026-08-01", "2026-12-31", "B-201", true);
         String token = student("6600101");
         get(token, ACADEMIC + "/next-class").andExpect(status().isOk())
                 .andExpect(jsonPath("$.courseCode").value("CSC-311"))
@@ -386,11 +403,14 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
                 .andExpect(jsonPath("$.dayOfWeek").value("FRIDAY"))
                 .andExpect(jsonPath("$.startsAt").value("2026-11-06T13:00:00+07:00"))
                 .andExpect(jsonPath("$.endsAt").value("2026-11-06T14:00:00+07:00"))
-                .andExpect(jsonPath("$.roomName").value(org.hamcrest.Matchers.nullValue()))
-                .andExpect(jsonPath("$.buildingName").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.roomName").value("B-201"))
+                .andExpect(jsonPath("$.roomNumber").value("B-201"))
+                .andExpect(jsonPath("$.buildingName").value("Building 11"))
+                .andExpect(jsonPath("$.campusId").value(site))
                 .andExpect(jsonPath("$.minutesUntilStart").value(2 * 24 * 60 + 3 * 60))
                 .andExpect(jsonPath("$.status").value("UPCOMING"))
-                .andExpect(jsonPath("$.scheduleBasis").value("REGULAR_TIMETABLE"));
+                .andExpect(jsonPath("$.occurrenceStatus").value("REGULAR"))
+                .andExpect(jsonPath("$.scheduleBasis").value("PUBLISHED_TIMETABLE"));
         clock.set(Instant.parse("2026-11-07T00:00:00Z")); // Saturday morning: both this week's are gone
         token = student("6600101");
         get(token, ACADEMIC + "/next-class").andExpect(jsonPath("$.courseCode").value("CSC-452"))
@@ -588,6 +608,7 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
         db.update("DELETE FROM student_course_results");
         db.update("DELETE FROM grade_definitions");
         db.update("DELETE FROM grading_schemes");
+        db.update("DELETE FROM timetable_meeting_exceptions");
         db.update("DELETE FROM course_section_meetings");
         db.update("DELETE FROM course_assignments");
         db.update("DELETE FROM course_exams");
@@ -595,6 +616,7 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
         db.update("DELETE FROM student_credentials");
         db.update("DELETE FROM students");
         db.update("DELETE FROM course_sections");
+        db.update("DELETE FROM academic_terms");
         db.update("DELETE FROM courses");
         db.update("DELETE FROM lectures");
         db.update("DELETE FROM semesters");
@@ -604,6 +626,9 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
         db.update("DELETE FROM app_user_roles");
         db.update("DELETE FROM appuser_credentials");
         db.update("DELETE FROM app_users");
+        db.update("DELETE FROM campus_rooms");
+        db.update("DELETE FROM campus_buildings");
+        db.update("DELETE FROM campus_sites");
     }
     private long admin(String email, String role) {
         long id = id("INSERT INTO app_users(employee_id,first_name,last_name,email,account_status) VALUES (?,'Data','Actor',?,'ACTIVE') RETURNING id", email, email);
@@ -616,8 +641,17 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
                 code, name, credits, faculty, department, actor);
     }
     private long section(long course, String number, long lecturer, long semester) {
-        return id("INSERT INTO course_sections(course_id,section_number,capacity,lecture_id,room,schedule,semester_id,status,created_by) VALUES (?,?,40,?,'Legacy room','Mon/Tues 02:00-4:00',?,'ACTIVE',?) RETURNING id",
-                course, number, lecturer, semester, actor);
+        return id("INSERT INTO course_sections(course_id,section_number,capacity,lecture_id,semester_id,academic_term_id,status,created_by) VALUES (?,?,40,?,?,(SELECT id FROM academic_terms WHERE semester_id=?),'ACTIVE',?) RETURNING id",
+                course, number, lecturer, semester, semester, actor);
+    }
+    private long term(long semester, String code, String from, String to) {
+        return id("INSERT INTO academic_terms(semester_id,academic_year_code,academic_year_label,start_date,end_date,status) VALUES (?,?,?,?::date,?::date,'ACTIVE') RETURNING id",
+                semester, code, code, from, to);
+    }
+    private long room(String number) {
+        Long existing = db.query("SELECT id FROM campus_rooms WHERE building_id=? AND room_number=?", rs -> rs.next() ? rs.getLong(1) : null, building, number);
+        return existing != null ? existing
+                : id("INSERT INTO campus_rooms(building_id,room_number,floor_number,room_type) VALUES (?,?,1,'CLASSROOM') RETURNING id", building, number);
     }
     private long student(String code, int studyYear) {
         long id = id("""
@@ -635,11 +669,12 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
         return id("INSERT INTO enrollments(student_id,course_section_id,enrollment_date,status,created_by) VALUES (?,?,DATE '2026-08-15',?,?) RETURNING id",
                 student, section, status, actor);
     }
+    // room is a campus room number (created on demand); active=true is a PUBLISHED meeting, false a DRAFT.
     private long meeting(long section, int day, String start, String end, String from, String to, String room, boolean active) {
         return id("""
-                INSERT INTO course_section_meetings(course_section_id,meeting_type,day_of_week,start_time,end_time,effective_from,effective_to,room_label,is_active)
-                VALUES (?,'LECTURE',?,?::time,?::time,?::date,?::date,?,?) RETURNING id
-                """, section, day, start, end, from, to, room, active);
+                INSERT INTO course_section_meetings(course_section_id,meeting_type,day_of_week,start_time,end_time,effective_from,effective_to,room_id,room_label,status,is_active)
+                VALUES (?,'LECTURE',?,?::time,?::time,?::date,?::date,?,?,?,?) RETURNING id
+                """, section, day, start, end, from, to, room == null ? null : room(room), room, active ? "PUBLISHED" : "DRAFT", active);
     }
     private long assignment(long section, String title, String due, String status) {
         return id("INSERT INTO course_assignments(course_section_id,title,due_at,status,created_by) VALUES (?,?,?::timestamptz,?,?) RETURNING id",
@@ -651,7 +686,7 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
     }
     private Map<String, Object> meetingBody(String type, int day, String start, String end) {
         return Map.of("meetingType", type, "dayOfWeek", day, "startTime", start, "endTime", end,
-                "effectiveFrom", "2026-08-01", "effectiveTo", "2026-12-31", "roomLabel", "1103");
+                "effectiveFrom", "2026-08-01", "effectiveTo", "2026-12-31", "roomId", room1103, "roomLabel", "1103");
     }
     private ResultActions create(String token, long enrollment, long grade) throws Exception {
         return post(token, RESULTS, Map.of("enrollmentId", enrollment, "gradeDefinitionId", grade));

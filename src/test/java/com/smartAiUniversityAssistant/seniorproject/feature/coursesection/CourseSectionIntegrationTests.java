@@ -92,7 +92,6 @@ class CourseSectionIntegrationTests extends IntegrationSupport {
         var sessions = redis.keys("susa:test:auth:session:*");
         var body = request(courseA, "  01  ", null, lectureA, semester1);
         body.remove("status");
-        body.put("room", "  ");
         var created = perform(post(BASE), body).andExpect(status().isCreated())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("courseId").value(courseA))
@@ -106,7 +105,7 @@ class CourseSectionIntegrationTests extends IntegrationSupport {
                 .andExpect(jsonPath("lectureNameEn").value("Nittaya Chindakharn"))
                 .andExpect(jsonPath("lectureNameTh").value("อาจารย์นิตยา จินดาขันธ์"))
                 .andExpect(jsonPath("room").doesNotExist())
-                .andExpect(jsonPath("schedule").value("Mon/Wed 08:00-09:30"))
+                .andExpect(jsonPath("schedule").doesNotExist())
                 .andExpect(jsonPath("semesterId").value(semester1))
                 .andExpect(jsonPath("semesterNameEn").value("Semester 1"))
                 .andExpect(jsonPath("semesterNameTh").value("ภาคการศึกษาที่ 1"))
@@ -117,9 +116,9 @@ class CourseSectionIntegrationTests extends IntegrationSupport {
                 .andExpect(jsonPath("updatedAt").doesNotExist())
                 .andExpect(jsonPath("isDeleted").doesNotExist()).andReturn();
         long id = tree(created).get("id").asLong();
-        assertThat(db.queryForMap("SELECT is_deleted,status,room,capacity,created_by,updated_by FROM course_sections WHERE id=?", id))
+        assertThat(db.queryForMap("SELECT is_deleted,status,capacity,created_by,updated_by FROM course_sections WHERE id=?", id))
                 .containsEntry("is_deleted", false).containsEntry("status", "ACTIVE")
-                .containsEntry("room", null).containsEntry("capacity", 50)
+                .containsEntry("capacity", 50)
                 .containsEntry("created_by", actorId).containsEntry("updated_by", null);
         courseSectionCount(courseA, 1);
         perform(get(BASE + "/summary"), null).andExpect(status().isOk())
@@ -130,12 +129,10 @@ class CourseSectionIntegrationTests extends IntegrationSupport {
         clock.advance(Duration.ofSeconds(5));
         var moved = request(courseA, "01", 60, lectureA2, semester2);
         moved.put("status", "closed");
-        moved.put("room", "IT-102");
         perform(put(BASE + "/" + id), moved).andExpect(status().isOk())
                 .andExpect(jsonPath("capacity").value(60))
                 .andExpect(jsonPath("lectureId").value(lectureA2))
                 .andExpect(jsonPath("semesterId").value(semester2))
-                .andExpect(jsonPath("room").value("IT-102"))
                 .andExpect(jsonPath("status").value("CLOSED"))
                 .andExpect(jsonPath("updatedBy").value(actorId))
                 .andExpect(jsonPath("updatedAt").value(clock.instant().toString()));
@@ -242,9 +239,10 @@ class CourseSectionIntegrationTests extends IntegrationSupport {
             body.put(field, 1);
             perform(post(BASE), body).andExpect(status().isBadRequest()).andExpect(jsonPath("code").value("VALIDATION_ERROR"));
         }
-        var longRoom = request(courseA, "01", 50, lectureA, semester1);
-        longRoom.put("room", "r".repeat(101));
-        perform(post(BASE), longRoom).andExpect(status().isBadRequest());
+        // Rooms and class times belong to the timetable (spec 40): the section API rejects the former free-text fields.
+        var legacy = request(courseA, "01", 50, lectureA, semester1);
+        legacy.put("room", "IT-101");
+        perform(post(BASE), legacy).andExpect(status().isBadRequest());
         long noDefaultCourse = course("CS999", "No Default Capacity", facultyA, departmentA, null);
         var noCapacity = request(noDefaultCourse, "01", null, lectureA, semester1);
         perform(post(BASE), noCapacity).andExpect(status().isBadRequest());
@@ -274,7 +272,6 @@ class CourseSectionIntegrationTests extends IntegrationSupport {
         long two = create(courseB, "A", lectureB, semester1);
         long three = create(courseA, "02", lectureA, semester2);
         db.update("UPDATE course_sections SET status='CLOSED' WHERE id=?", three);
-        db.update("UPDATE course_sections SET room='LAB-100%_' WHERE id=?", two);
         long gone = create(courseA, "03", lectureA, semester1);
         perform(delete(BASE + "/" + gone), null).andExpect(status().isNoContent());
         perform(get(BASE), null).andExpect(status().isOk()).andExpect(jsonPath("page").value(0))
@@ -286,7 +283,7 @@ class CourseSectionIntegrationTests extends IntegrationSupport {
         for (String search : List.of("cs101", "introduction", "nittaya", "นิตยา"))
             perform(get(BASE).param("search", search), null).andExpect(status().isOk())
                     .andExpect(jsonPath("totalElements").value(2));
-        for (String search : List.of("wipa", "lab-100%_"))
+        for (String search : List.of("wipa", "100%_"))
             perform(get(BASE).param("search", search), null).andExpect(status().isOk())
                     .andExpect(jsonPath("totalElements").value(1)).andExpect(jsonPath("content[0].id").value(two));
         // "01" would also match course codes CS101/CS201; "02" isolates the section-number search path.
@@ -423,8 +420,6 @@ class CourseSectionIntegrationTests extends IntegrationSupport {
         body.put("sectionNumber", section);
         body.put("capacity", capacity);
         body.put("lectureId", lecture);
-        body.put("room", "IT-101");
-        body.put("schedule", "Mon/Wed 08:00-09:30");
         body.put("semesterId", semester);
         body.put("status", "ACTIVE");
         return body;

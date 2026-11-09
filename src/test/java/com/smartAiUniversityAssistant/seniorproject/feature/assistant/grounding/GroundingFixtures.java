@@ -22,8 +22,16 @@ final class GroundingFixtures {
 
     static Map<String, Object> section(String code, String section, String room, String schedule, String lecturer) {
         return map("courseCode", code, "courseName", "Data Structures", "courseSectionId", 1501, "sectionNumber", section,
-                "semesterNameEn", "Semester 1", "semesterNameTh", null, "semesterAcademicYear", 2026, "room", room,
-                "schedule", schedule, "lecturerNameEn", lecturer, "lecturerNameTh", null, "enrollmentStatus", "ACTIVE");
+                "semesterNameEn", "Semester 1", "semesterNameTh", null, "semesterAcademicYear", 2026,
+                "lecturerNameEn", lecturer, "lecturerNameTh", null, "enrollmentStatus", "ACTIVE", "meetings", meetings(room, schedule));
+    }
+
+    /** The published timetable in the mapper's shape: one LECTURE meeting parsed from "Tuesday 09:00-11:45" (none when null). */
+    static List<Map<String, Object>> meetings(String room, String schedule) {
+        if (schedule == null && room == null) return List.of();
+        String[] parts = (schedule == null ? "Monday 09:00-12:00" : schedule).split("[ -]");
+        return List.of(map("meetingType", "LECTURE", "dayOfWeek", parts[0].toUpperCase(Locale.ROOT), "startTime", parts[1], "endTime", parts[2],
+                "effectiveFrom", "2026-01-05", "effectiveTo", "2026-12-25", "roomNumber", room, "buildingName", room == null ? null : "Test Building"));
     }
 
     static Map<String, Object> course(String code, String name, Integer credits) {
@@ -37,7 +45,7 @@ final class GroundingFixtures {
     static Map<String, Object> enrollment(String code, String name, String section) {
         return map("courseCode", code, "courseName", name, "creditHours", 3, "courseSectionId", 1501, "sectionNumber", section,
                 "enrollmentStatus", "ACTIVE", "semesterNameEn", "Semester 1", "semesterNameTh", null, "semesterAcademicYear", 2026,
-                "lecturerNameEn", "Dr. John Smith", "lecturerNameTh", null, "room", "11-402", "schedule", "Tuesday 09:00-11:45");
+                "lecturerNameEn", "Dr. John Smith", "lecturerNameTh", null, "meetings", meetings("11-402", "Tuesday 09:00-11:45"));
     }
 
     static Map<String, Object> availability(int capacity, long occupied) {
