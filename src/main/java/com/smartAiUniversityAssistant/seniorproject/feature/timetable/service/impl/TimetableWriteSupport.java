@@ -17,6 +17,7 @@ class TimetableWriteSupport {
             "uk_timetable_exception_original_occurrence", TimetableFailure::exceptionDuplicate,
             "chk_published_meeting_room", () -> TimetableFailure.publishNotAllowed("A published meeting needs a campus room."),
             "fk_course_section_meetings_room", TimetableFailure::roomNotFound,
+            "chk_meeting_enrollment_due_date", TimetableFailure::invalidEnrollmentDueDate,
             "fk_course_sections_academic_term", TimetableFailure::termNotFound);
 
     private final EntityManager entityManager;

@@ -347,7 +347,7 @@ class AuthenticationIntegrationTests extends IntegrationSupport {
     @Test void migrationHistoryAndSchemaStayValid() {
         assertThat(db.queryForList("SELECT checksum FROM flyway_schema_history WHERE version IN ('1','2','3','4','5','6') ORDER BY installed_rank",Integer.class))
                 .containsExactly(-1609524967,-715303110,750119622,111998084,-1083275929,347487127);
-        assertThat(db.queryForObject("SELECT count(*) FROM flyway_schema_history",Integer.class)).isEqualTo(44);
+        assertThat(db.queryForObject("SELECT count(*) FROM flyway_schema_history",Integer.class)).isEqualTo(47);
         assertThat(db.queryForObject("SELECT description FROM flyway_schema_history WHERE version='7'",String.class))
                 .isEqualTo("seed super admin account");
         assertThat(db.queryForObject("SELECT description FROM flyway_schema_history WHERE version='8'",String.class))

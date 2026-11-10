@@ -11,6 +11,7 @@ import com.smartAiUniversityAssistant.seniorproject.feature.enrollment.exception
 import com.smartAiUniversityAssistant.seniorproject.feature.enrollment.mapper.EnrollmentMapper;
 import com.smartAiUniversityAssistant.seniorproject.feature.enrollment.repository.EnrollmentRepository;
 import com.smartAiUniversityAssistant.seniorproject.feature.enrollment.service.EnrollmentService;
+import com.smartAiUniversityAssistant.seniorproject.feature.enrollment.service.EnrollmentWindowService;
 import com.smartAiUniversityAssistant.seniorproject.feature.student.entity.Student;
 import com.smartAiUniversityAssistant.seniorproject.feature.student.enums.StudentAccountStatus;
 import com.smartAiUniversityAssistant.seniorproject.feature.student.exception.StudentNotFoundException;
@@ -34,15 +35,18 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     private final StudentRepository students;
     private final CourseSectionRepository sections;
     private final EnrollmentMapper mapper;
+    private final EnrollmentWindowService windows;
     private final Clock clock;
     private final EntityManager entityManager;
 
     public EnrollmentServiceImpl(EnrollmentRepository enrollments, StudentRepository students,
-            CourseSectionRepository sections, EnrollmentMapper mapper, Clock clock, EntityManager entityManager) {
+            CourseSectionRepository sections, EnrollmentMapper mapper, EnrollmentWindowService windows, Clock clock,
+            EntityManager entityManager) {
         this.enrollments = enrollments;
         this.students = students;
         this.sections = sections;
         this.mapper = mapper;
+        this.windows = windows;
         this.clock = clock;
         this.entityManager = entityManager;
     }
@@ -58,6 +62,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         requireNotDuplicate(student, section, 0L);
         if (status.holdsSeat()) {
             requireNoCourseConflict(student, section, 0L);
+            windows.requireOpen(section.getId());
             requireSeat(section);
         }
         var enrollment = new Enrollment();
@@ -122,7 +127,10 @@ public class EnrollmentServiceImpl implements EnrollmentService {
             requireNotDuplicate(student, section, id);
             if (target.holdsSeat()) {
                 requireNoCourseConflict(student, section, id);
-                if (sectionChanged) requireSeat(section);
+                if (sectionChanged) {
+                    windows.requireOpen(section.getId());
+                    requireSeat(section);
+                }
             }
             enrollment.setStudent(student);
             enrollment.setCourseSection(section);
@@ -229,6 +237,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         if (enrollment.getStatus().holdsSeat() || !target.holdsSeat()) return;
         CourseSection section = availableSection(enrollment.getCourseSection().getId());
         requireNoCourseConflict(enrollment.getStudent(), section, enrollment.getId());
+        windows.requireOpen(section.getId());
         requireSeat(section);
     }
 

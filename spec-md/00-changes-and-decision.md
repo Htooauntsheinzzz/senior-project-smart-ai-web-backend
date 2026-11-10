@@ -476,3 +476,51 @@
 - **Known limits:** no student-conflict check; the room/building/campus filters ignore one-day room moves; `GET /conflicts` recomputes from all published rows on every call (fine at university scale, no cache); overnight meetings are refused (`start < end`).
 - **Existing tests changed:** migration count pins 39 → 44 (`AuthenticationIntegrationTests`, `SuperAdminMigrationTests`, `KnowledgeSchemaMigrationTests`), public table count 41 → 43, `CampusSchemaMigrationTests` history 33..44, `CampusIntegrationSupport` also clears `timetable_meeting_exceptions` and `academic_terms`, `AcademicAiToolExecutorTests` passes the new `meetings` list.
 - **Verification:** `./mvnw clean package`: 951 tests, 0 failures, 0 errors, 1 skipped (live Gemini, opt-in); BUILD SUCCESS. Hsu's Docker backend was not rebuilt, so the dev database is still at V32 until it restarts (Flyway then applies V33 to V44).
+
+### D59 — Student self-enrollment from the mobile application (spec file 43)
+
+- **Date:** 2026-11-10
+- **Context:** The product owner asked for students to enroll from the mobile app. Spec file 26 had deferred "Student Mobile Self-Enrollment"; spec file 25 already planned that a student request starts as `PENDING`.
+- **Decision:** New student endpoints in `feature/enrollment` (`StudentEnrollmentController`, `StudentEnrollmentService[Impl]`): `GET /api/v1/student/enrollments/available-sections`, `POST /api/v1/student/enrollments` (creates `PENDING`), `POST /api/v1/student/enrollments/{id}/withdraw` (`PENDING`/`ACTIVE` → `WITHDRAWN`). An admin still activates a request through the existing status endpoint; the admin web is unchanged. Capacity, duplicate, same-course and locking rules are the admin workflow's. Only sections of the student's own semester are offered. A withdrawn row is reused instead of inserting a second one (one lifecycle per student and section, spec file 25). `DROPPED` is final for the student (new code `ENROLLMENT_DROPPED_BY_UNIVERSITY`). Enroll and withdraw answer with the existing `StudentAcademicEnrollmentResponse`.
+- **Migration:** V46 makes `enrollments.created_by` nullable; `NULL` means the student created the row, because `created_by` references `app_users`.
+- **Existing tests changed:** migration count pins 44 → 46 (`AuthenticationIntegrationTests`, `SuperAdminMigrationTests`, `KnowledgeSchemaMigrationTests`, `TimetableSchemaMigrationTests`, `CampusSchemaMigrationTests`). These already failed at 45 since V45 was added; they now include V45 and V46.
+- **Tests:** new `StudentEnrollmentIntegrationTests` (6, all pass). `EnrollmentIntegrationTests` and `StudentAcademicIntegrationTests` still pass. Full `./mvnw test`: 958 tests, 10 failures, 141 errors. Before this change (same checkout, `git stash`): 952 tests, 16 failures, 141 errors, in the same classes plus the migration pins. The rest were already failing and are not caused by D59: test classes leave `course_section_meetings` rows behind, so a later class's `DELETE FROM course_sections` / `campus_rooms` fails on a foreign key (most of the errors), and the grounding evaluation and academic query tests fail on their own.
+- **Not done:** Hsu's Docker backend was not rebuilt; rebuilding applies V46 to the dev database. Checked instead on a separate Compose project (`smcheck`, port 18080) with its own database.
+
+### D60 — Student enrollment lock: pending requests become active without an admin (spec file 43, section 2.4)
+
+- **Date:** 2026-11-10
+- **Context:** Following the university's registration flow, the product owner asked that a student lock their enrollment and that locked subjects become active automatically, so an admin does not have to activate each request (changes D59's "an admin activates it").
+- **Decision:** `POST /api/v1/student/enrollments/lock` (`StudentEnrollmentController.lock`, `StudentEnrollmentServiceImpl.lock`) sets every `PENDING` enrollment of the student's current semester to `ACTIVE` in one transaction, locking the Student, each enrollment and its section. All or nothing; new codes `NO_PENDING_ENROLLMENTS` and `ENROLLMENT_LOCK_SECTION_CLOSED` (409). No capacity check is needed because a pending row already holds its seat. Admin endpoints are unchanged and still work. No migration.
+- **Tests:** two new cases in `StudentEnrollmentIntegrationTests` (8 pass); `EnrollmentIntegrationTests` (10) still pass. Checked on the `smcheck` copy (port 18080); Hsu's Docker backend was not rebuilt.
+
+### D61 — Lock one subject (spec file 43, section 2.5)
+
+- **Date:** 2026-11-10
+- **Context:** The product owner wants students to lock each subject separately in the mobile app instead of all at once (D60).
+- **Decision:** `POST /api/v1/student/enrollments/{id}/lock` (`StudentEnrollmentServiceImpl.lockOne`) makes one of the token student's `PENDING` enrollments `ACTIVE`. New 409 code `ENROLLMENT_NOT_PENDING`; the closed-section check is shared with D60 through `activate`. D60's lock-all endpoint is kept but the app no longer calls it. No migration; admin endpoints unchanged.
+- **Tests:** one new case; `StudentEnrollmentIntegrationTests` 9 and `EnrollmentIntegrationTests` 10 pass. Checked on the `smcheck` copy (port 18080).
+
+### D62 — Enrollment only into published-timetable sections, with an enrollment due date (spec file 44)
+
+- **Date:** 2026-11-10
+- **Context:** The product owner asked that the subjects a Student or an Admin can enroll are those in the timetable, that the timetable carries an enrollment due date that is not after the effective start date, and that enrollment is refused after the due date or when the section is full.
+- **Decision:** V47 adds `course_section_meetings.enrollment_due_date` (nullable, `CHECK <= effective_from`). `enrollmentDueDate` is an optional field of the timetable meeting create, bulk, update and facade bodies and of every meeting response; a later date is 400 `TIMETABLE_INVALID_ENROLLMENT_DUE_DATE`. New `EnrollmentWindowService`: a section is enrollable when it has a live `PUBLISHED` meeting (else 409 `COURSE_SECTION_NOT_IN_TIMETABLE`) and today in Asia/Bangkok is not after the earliest due date of its published meetings (else 409 `ENROLLMENT_DUE_DATE_PASSED`). It is called by the student enroll, the admin create, the admin move to another section and `acquireSeatIfNeeded`, before the unchanged capacity check. The student list returns only scheduled sections, with `enrollmentDueDate`, `enrollmentClosed` and `blockedReason: ENROLLMENT_CLOSED`. The admin section list gains `scheduled=true|false` and the fields `scheduled`, `enrollmentDueDate`, `enrollmentOpen`.
+- **Choices made where the request left room, all flagged to the owner:**
+  - **The due date lives on the meeting**, because the request ties it to the schedule's effective start date. A section with several meetings uses the earliest due date.
+  - **Optional:** no due date means no deadline. Existing meetings have none and no date was invented.
+  - **The due date itself is still open**; enrollment closes the next day.
+  - **Locking a pending request after the due date is allowed**, and so is an admin activating one: the seat was requested in time. Only new seats are refused.
+  - **Admin records that hold no seat** (`WITHDRAWN`, `DROPPED`) skip both rules, as they already skip capacity.
+  - **The admin section list is not filtered by default**; the enrollment picker asks for `scheduled=true`.
+  - **A closed section stays in the student list** with a reason, instead of disappearing.
+- **Existing behaviour changed:** an Admin can no longer enroll a student into a section without a published timetable. Existing enrollments are untouched.
+- **Existing tests changed:** migration pins 46 → 47; `StudentEnrollmentIntegrationTests` sections now have published meetings.
+- **Admin web:** the schedule form has an optional Enrollment Due Date, the class drawer shows it, the enrollment section picker lists only scheduled sections and shows the due date, and the two new refusal codes have messages.
+
+### D63 — Course description in the student enrollment response
+
+- **Date:** 2026-11-10
+- **Context:** The mobile My Courses cards now share the Enroll page's layout, which shows the course description (mobile DEC-027).
+- **Decision:** `StudentAcademicEnrollmentResponse` gains `description` (the course's), added as the last component and filled in `StudentAcademicMapper.enrollment`. It is returned by `GET /api/v1/student/academic/enrollments` and by the student enroll, lock and withdraw endpoints. Additive; no migration.
+- **Tests:** `StudentEnrollmentIntegrationTests` checks the field on enroll; it and `StudentAcademicIntegrationTests` / `StudentAcademicDataIntegrationTests` pass.

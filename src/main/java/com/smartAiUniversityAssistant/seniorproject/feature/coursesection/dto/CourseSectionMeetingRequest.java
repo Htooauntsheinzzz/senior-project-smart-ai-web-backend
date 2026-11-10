@@ -12,6 +12,7 @@ public record CourseSectionMeetingRequest(
         @NotNull @JsonFormat(pattern = "HH:mm") LocalTime endTime,
         @NotNull LocalDate effectiveFrom,
         @NotNull LocalDate effectiveTo,
+        LocalDate enrollmentDueDate,
         @Positive Long roomId,
         @Size(max = 150) String roomLabel,
         Boolean active) {

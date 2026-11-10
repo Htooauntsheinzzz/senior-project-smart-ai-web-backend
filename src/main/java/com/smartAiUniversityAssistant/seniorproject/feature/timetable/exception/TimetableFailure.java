@@ -31,6 +31,9 @@ public class TimetableFailure extends RuntimeException {
 
     public static TimetableFailure invalidTime() { return new TimetableFailure(400, "TIMETABLE_INVALID_TIME", "The end time must be after the start time."); }
     public static TimetableFailure invalidDateRange(String message) { return new TimetableFailure(400, "TIMETABLE_INVALID_DATE_RANGE", message); }
+    public static TimetableFailure invalidEnrollmentDueDate() {
+        return new TimetableFailure(400, "TIMETABLE_INVALID_ENROLLMENT_DUE_DATE", "The enrollment due date must not be after the effective start date.");
+    }
     public static TimetableFailure invalidWeekday() { return new TimetableFailure(400, "TIMETABLE_INVALID_WEEKDAY", "The weekday must be 1 (Monday) to 7 (Sunday)."); }
     public static TimetableFailure roomNotFound() { return new TimetableFailure(400, "TIMETABLE_ROOM_NOT_FOUND", "The room does not exist or is deleted."); }
     public static TimetableFailure roomUnavailable(String message) { return new TimetableFailure(400, "TIMETABLE_ROOM_UNAVAILABLE", message); }

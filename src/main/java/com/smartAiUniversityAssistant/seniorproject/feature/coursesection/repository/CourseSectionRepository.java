@@ -25,6 +25,15 @@ public interface CourseSectionRepository extends JpaRepository<CourseSection, Lo
     @Query("select s from CourseSection s where s.id = :id")
     Optional<CourseSection> findByIdForUpdate(@Param("id") Long id);
 
+    // Sections a Student may request from the mobile application: open sections of live, active courses in one semester.
+    @Query("""
+            select s from CourseSection s join fetch s.course c join fetch s.lecture join fetch s.semester sem
+            where sem.id = :semesterId and s.deleted = false and s.status = 'ACTIVE'
+              and c.deleted = false and c.active = true
+            order by c.courseCode asc, s.sectionNumber asc, s.id asc
+            """)
+    List<CourseSection> findOpenForSelfEnrollment(@Param("semesterId") Long semesterId);
+
     interface CourseCount {
         Long getCourseId();
         long getTotal();

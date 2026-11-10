@@ -45,7 +45,7 @@ public class TimetableMapper {
                 new TimetableNamedRef(course.getDepartment().getId(), course.getDepartment().getDepartmentCode(), course.getDepartment().getDepartmentName()),
                 new TimetableNamedRef(lecture.getId(), lecture.getLectureNameTh(), lecture.getLectureNameEn()),
                 location(m.getRoom(), m.getRoomLabel()), m.getMeetingType(), m.getDayOfWeek(), DayOfWeek.of(m.getDayOfWeek()).name(),
-                m.getStartTime(), m.getEndTime(), m.getEffectiveFrom(), m.getEffectiveTo(), m.getStatus(), m.getNotes(),
+                m.getStartTime(), m.getEndTime(), m.getEffectiveFrom(), m.getEffectiveTo(), m.getEnrollmentDueDate(), m.getStatus(), m.getNotes(),
                 m.getCreatedBy(), instant(m.getCreatedAt()), m.getUpdatedBy(), instant(m.getUpdatedAt()));
     }
 
@@ -63,7 +63,7 @@ public class TimetableMapper {
                 m.getDayOfWeek(), DayOfWeek.of(m.getDayOfWeek()).name(), m.getStartTime(), m.getEndTime(),
                 b == null ? null : b.getSite().getId(), b == null ? null : b.getSite().getSiteName(), b == null ? null : b.getId(),
                 b == null ? null : b.getBuildingName(), room == null ? null : room.getId(), room == null ? null : room.getRoomNumber(),
-                m.getRoomLabel(), m.getMeetingType(), m.getStatus(), m.getEffectiveFrom(), m.getEffectiveTo());
+                m.getRoomLabel(), m.getMeetingType(), m.getStatus(), m.getEffectiveFrom(), m.getEffectiveTo(), m.getEnrollmentDueDate());
     }
 
     public TimetableConflictMeeting conflictMeeting(CourseSectionMeeting m) {

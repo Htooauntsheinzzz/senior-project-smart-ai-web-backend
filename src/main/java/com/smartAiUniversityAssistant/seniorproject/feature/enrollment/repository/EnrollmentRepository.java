@@ -19,6 +19,9 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long>, J
     // Includes soft-deleted rows: UNIQUE(student_id, course_section_id) still reserves the pair.
     boolean existsByStudentIdAndCourseSectionIdAndIdNot(Long studentId, Long courseSectionId, Long id);
 
+    // Includes soft-deleted rows for the same reason; self-enrollment reuses the row instead of inserting a second one.
+    Optional<Enrollment> findByStudentIdAndCourseSectionId(Long studentId, Long courseSectionId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))
     @Query("select e from Enrollment e where e.id = :id")

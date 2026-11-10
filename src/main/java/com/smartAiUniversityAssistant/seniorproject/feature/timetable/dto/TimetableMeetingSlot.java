@@ -9,7 +9,8 @@ import java.time.*;
 public record TimetableMeetingSlot(@Positive Long roomId, @NotNull CourseMeetingType meetingType,
         @NotNull @Min(1) @Max(7) Integer dayOfWeek,
         @NotNull @JsonFormat(pattern = "HH:mm") LocalTime startTime, @NotNull @JsonFormat(pattern = "HH:mm") LocalTime endTime,
-        @NotNull LocalDate effectiveFrom, @NotNull LocalDate effectiveTo, @Size(max = 2000) String notes) {
+        @NotNull LocalDate effectiveFrom, @NotNull LocalDate effectiveTo, LocalDate enrollmentDueDate,
+        @Size(max = 2000) String notes) {
     public TimetableMeetingSlot {
         notes = notes == null || notes.isBlank() ? null : notes.trim();
     }

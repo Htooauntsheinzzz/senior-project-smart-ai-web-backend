@@ -9,5 +9,5 @@ public record TimetableMeetingResponse(Long id, TimetableNamedRef courseSection,
         TimetableNamedRef faculty, TimetableNamedRef department, TimetableNamedRef lecturer, TimetableLocation location,
         CourseMeetingType meetingType, int dayOfWeek, String dayName,
         @JsonFormat(pattern = "HH:mm") LocalTime startTime, @JsonFormat(pattern = "HH:mm") LocalTime endTime,
-        LocalDate effectiveFrom, LocalDate effectiveTo, TimetableMeetingStatus status, String notes,
+        LocalDate effectiveFrom, LocalDate effectiveTo, LocalDate enrollmentDueDate, TimetableMeetingStatus status, String notes,
         Long createdBy, Instant createdAt, Long updatedBy, Instant updatedAt) {}

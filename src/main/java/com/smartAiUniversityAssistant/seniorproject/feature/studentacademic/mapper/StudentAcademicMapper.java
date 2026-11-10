@@ -39,7 +39,7 @@ public class StudentAcademicMapper {
                 course.getId(), course.getCourseCode(), course.getCourseName(), course.getCreditHours(),
                 integer(course.getCourseType()), section.getId(), section.getSectionNumber(),
                 semester.getId(), semester.getAcademicYear(), semester.getSemesterNameEn(), semester.getSemesterNameTh(),
-                lecture.getId(), lecture.getLectureNameEn(), lecture.getLectureNameTh(), meetings);
+                lecture.getId(), lecture.getLectureNameEn(), lecture.getLectureNameTh(), meetings, course.getDescription());
     }
 
     public StudentAcademicCourseResponse course(Enrollment e, List<StudentCourseMeetingResponse> meetings) {

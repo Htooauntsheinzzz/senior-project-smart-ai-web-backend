@@ -163,6 +163,25 @@ class TimetableIntegrationTests extends IntegrationSupport {
         post(superToken, TIMETABLE + "/meetings", bogus).andExpect(status().isBadRequest()); // redundant identifiers are refused
         post(superToken, TIMETABLE + "/meetings", meeting(sectionA, roomA, "SEMINAR", 1, "09:00", "11:00")).andExpect(status().isBadRequest());
 
+        // Spec file 44: the enrollment due date may not be after the effective start date (2026-08-01 here).
+        var lateDue = meeting(sectionA, roomA, "LECTURE", 1, "09:00", "11:00");
+        lateDue.put("enrollmentDueDate", "2026-08-02");
+        post(superToken, TIMETABLE + "/meetings", lateDue).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("TIMETABLE_INVALID_ENROLLMENT_DUE_DATE"));
+        lateDue.put("enrollmentDueDate", "2026-08-01");
+        long withDue = idOf(post(superToken, TIMETABLE + "/meetings", lateDue).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.enrollmentDueDate").value("2026-08-01")));
+        var movedDue = slot(roomA, "LECTURE", 1, "09:00", "11:00", null);
+        movedDue.put("enrollmentDueDate", "2026-09-01");
+        put(superToken, TIMETABLE + "/meetings/" + withDue, movedDue).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("TIMETABLE_INVALID_ENROLLMENT_DUE_DATE"));
+        movedDue.put("enrollmentDueDate", "2026-07-25");
+        put(superToken, TIMETABLE + "/meetings/" + withDue, movedDue).andExpect(status().isOk())
+                .andExpect(jsonPath("$.enrollmentDueDate").value("2026-07-25"));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> db.update("UPDATE course_section_meetings SET enrollment_due_date=DATE '2026-08-02' WHERE id=?", withDue))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        mvc.perform(auth(MockMvcRequestBuilders.delete(TIMETABLE + "/meetings/" + withDue), superToken)).andExpect(status().isNoContent());
+
         long id = idOf(post(academicToken, TIMETABLE + "/meetings", meeting(sectionA, null, "LECTURE", 1, "09:00", "11:45")).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("DRAFT")).andExpect(jsonPath("$.course.code").value("CSC-452"))
                 .andExpect(jsonPath("$.courseSection.code").value("02")).andExpect(jsonPath("$.lecturer.name").value("Lecturer A"))

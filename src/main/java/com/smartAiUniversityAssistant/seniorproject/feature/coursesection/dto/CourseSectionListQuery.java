@@ -6,9 +6,9 @@ import java.util.*;
 import org.springframework.data.domain.*;
 
 public record CourseSectionListQuery(int page, int size, String search, Long courseId, Long semesterId, Long lectureId,
-        String status, List<String> sort) {
+        String status, Boolean scheduled, List<String> sort) {
     private static final Set<String> PARAMETERS = Set.of("page", "size", "search", "courseId", "semesterId",
-            "lectureId", "status", "sort");
+            "lectureId", "status", "scheduled", "sort");
     private static final Set<String> SORT_FIELDS = Set.of("id", "sectionNumber", "capacity", "status",
             "createdAt", "updatedAt");
 
@@ -45,9 +45,11 @@ public record CourseSectionListQuery(int page, int size, String search, Long cou
             Long lecture = request.getParameter("lectureId") == null ? null : number(request.getParameter("lectureId"), 0);
             String status = request.getParameter("status");
             if (status != null && !Set.of("ACTIVE", "CLOSED").contains(status)) throw invalid();
+            String scheduled = request.getParameter("scheduled");
+            if (scheduled != null && !Set.of("true", "false").contains(scheduled)) throw invalid();
             String[] sort = request.getParameterValues("sort");
             return new CourseSectionListQuery(Math.toIntExact(page), Math.toIntExact(size), request.getParameter("search"),
-                    course, semester, lecture, status, sort == null ? List.of() : List.of(sort));
+                    course, semester, lecture, status, scheduled == null ? null : Boolean.valueOf(scheduled), sort == null ? List.of() : List.of(sort));
         } catch (ArithmeticException | NumberFormatException e) {
             throw invalid();
         }

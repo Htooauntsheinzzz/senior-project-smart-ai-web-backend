@@ -61,7 +61,7 @@ public class CourseSectionMeetingServiceImpl implements CourseSectionMeetingServ
             throw new CourseSectionFailure(400, "VALIDATION_ERROR", "The meeting type must be LECTURE, LAB or TUTORIAL.");
         }
         return new TimetableMeetingSlot(request.roomId(), type, request.dayOfWeek(), request.startTime(), request.endTime(),
-                request.effectiveFrom(), request.effectiveTo(), null);
+                request.effectiveFrom(), request.effectiveTo(), request.enrollmentDueDate(), null);
     }
     private static void requireFull(AuthenticatedUser actor) {
         if (actor.forcePasswordChange()) throw new PasswordChangeRequiredException();

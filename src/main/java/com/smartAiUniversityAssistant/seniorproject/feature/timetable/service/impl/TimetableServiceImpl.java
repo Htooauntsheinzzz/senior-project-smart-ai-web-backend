@@ -256,7 +256,7 @@ public class TimetableServiceImpl implements TimetableService {
         CourseSection section = schedulableSection(request.courseSectionId(), false);
         CampusRoom room = room(request.roomId());
         var slot = new TimetableMeetingSlot(request.roomId(), request.meetingType(), request.dayOfWeek(), request.startTime(), request.endTime(),
-                request.effectiveFrom(), request.effectiveTo(), null);
+                request.effectiveFrom(), request.effectiveTo(), null, null);
         validate(slot, section.getAcademicTerm());
         List<TimetableMeetingException> own = request.meetingId() == null ? List.of()
                 : exceptions.findByMeetingIdAndDeletedFalseOrderByOriginalDateAscIdAsc(request.meetingId());
@@ -398,6 +398,7 @@ public class TimetableServiceImpl implements TimetableService {
         meeting.setEndTime(minutes(slot.endTime()));
         meeting.setEffectiveFrom(slot.effectiveFrom());
         meeting.setEffectiveTo(slot.effectiveTo());
+        meeting.setEnrollmentDueDate(slot.enrollmentDueDate());
         meeting.setRoom(room);
         meeting.setRoomLabel(legacyLabel);
         meeting.setNotes(slot.notes());
@@ -507,6 +508,9 @@ public class TimetableServiceImpl implements TimetableService {
         if (slot.dayOfWeek() < 1 || slot.dayOfWeek() > 7) throw TimetableFailure.invalidWeekday();
         if (!minutes(slot.endTime()).isAfter(minutes(slot.startTime()))) throw TimetableFailure.invalidTime();
         if (slot.effectiveTo().isBefore(slot.effectiveFrom())) throw TimetableFailure.invalidDateRange("effectiveTo must not be before effectiveFrom.");
+        // Enrollment closes no later than the first class day (spec file 44).
+        if (slot.enrollmentDueDate() != null && slot.enrollmentDueDate().isAfter(slot.effectiveFrom()))
+            throw TimetableFailure.invalidEnrollmentDueDate();
         if (term != null && (slot.effectiveFrom().isBefore(term.getStartDate()) || slot.effectiveTo().isAfter(term.getEndDate())))
             throw TimetableFailure.invalidDateRange("The meeting dates must lie within the academic term (" + term.getStartDate() + " to " + term.getEndDate() + ").");
     }

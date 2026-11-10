@@ -11,4 +11,4 @@ public record TimetableMeetingListItem(Long id, Long courseSectionId, String cou
         Long academicTermId, String academicYearLabel, String semesterName,
         int dayOfWeek, String dayName, @JsonFormat(pattern = "HH:mm") LocalTime startTime, @JsonFormat(pattern = "HH:mm") LocalTime endTime,
         Long campusId, String campusName, Long buildingId, String buildingName, Long roomId, String roomNumber, String legacyRoomLabel,
-        CourseMeetingType meetingType, TimetableMeetingStatus status, LocalDate effectiveFrom, LocalDate effectiveTo) {}
+        CourseMeetingType meetingType, TimetableMeetingStatus status, LocalDate effectiveFrom, LocalDate effectiveTo, LocalDate enrollmentDueDate) {}

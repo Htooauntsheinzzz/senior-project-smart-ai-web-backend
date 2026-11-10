@@ -26,6 +26,8 @@ public class CourseSectionMeeting {
     @Column(name = "end_time", nullable = false) private LocalTime endTime;
     @Column(name = "effective_from", nullable = false) private LocalDate effectiveFrom;
     @Column(name = "effective_to", nullable = false) private LocalDate effectiveTo;
+    // Last day to enroll into the section (spec file 44); null means no deadline. Never after effectiveFrom.
+    @Column(name = "enrollment_due_date") private LocalDate enrollmentDueDate;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "room_id") private CampusRoom room;
     @Column(name = "room_label", length = 150) private String roomLabel;

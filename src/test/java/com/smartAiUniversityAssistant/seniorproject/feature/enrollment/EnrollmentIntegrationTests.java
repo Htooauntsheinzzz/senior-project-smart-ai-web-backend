@@ -185,6 +185,33 @@ class EnrollmentIntegrationTests extends IntegrationSupport {
     }
 
     @Test
+    void adminEnrollmentNeedsAPublishedTimetableAndAnOpenDueDate() throws Exception {
+        db.update("UPDATE course_section_meetings SET status='DRAFT',is_active=FALSE WHERE course_section_id=?", sectionA2);
+        perform(post(BASE), body(studentA, sectionA2, "ACTIVE")).andExpect(status().isConflict())
+                .andExpect(jsonPath("code").value("COURSE_SECTION_NOT_IN_TIMETABLE"));
+        perform(get(SECTIONS).param("scheduled", "true").param("size", "100"), null).andExpect(status().isOk())
+                .andExpect(jsonPath("content[?(@.id==" + sectionA2 + ")]").isEmpty())
+                .andExpect(jsonPath("content[?(@.id==" + sectionA1 + ")].scheduled").value(true))
+                .andExpect(jsonPath("content[?(@.id==" + sectionA1 + ")].enrollmentOpen").value(true));
+        perform(get(SECTIONS).param("scheduled", "false").param("size", "100"), null).andExpect(status().isOk())
+                .andExpect(jsonPath("content[?(@.id==" + sectionA2 + ")].scheduled").value(false));
+        perform(get(SECTIONS).param("scheduled", "yes"), null).andExpect(status().isBadRequest());
+
+        LocalDate bangkok = LocalDate.ofInstant(start, ZoneId.of("Asia/Bangkok"));
+        db.update("UPDATE course_section_meetings SET effective_from=?,effective_to=?,enrollment_due_date=? WHERE course_section_id=?",
+                bangkok.plusDays(10), bangkok.plusDays(100), bangkok.minusDays(1), sectionA1);
+        perform(post(BASE), body(studentA, sectionA1, "PENDING")).andExpect(status().isConflict())
+                .andExpect(jsonPath("code").value("ENROLLMENT_DUE_DATE_PASSED"));
+        perform(get(SECTIONS).param("scheduled", "true").param("size", "100"), null)
+                .andExpect(jsonPath("content[?(@.id==" + sectionA1 + ")].enrollmentOpen").value(false))
+                .andExpect(jsonPath("content[?(@.id==" + sectionA1 + ")].enrollmentDueDate").value(bangkok.minusDays(1).toString()));
+        // A record that holds no seat is history, not a new enrollment, so the window does not apply.
+        perform(post(BASE), body(studentA, sectionA1, "WITHDRAWN")).andExpect(status().isCreated());
+        db.update("UPDATE course_section_meetings SET enrollment_due_date=? WHERE course_section_id=?", bangkok, sectionA1);
+        perform(post(BASE), body(studentB, sectionA1, "ACTIVE")).andExpect(status().isCreated());
+    }
+
+    @Test
     void duplicateCourseSemesterAndCapacityRules() throws Exception {
         long first = create(studentA, sectionA1, "ACTIVE");
         perform(post(BASE), body(studentA, sectionA1, "PENDING")).andExpect(status().isConflict())
