@@ -13,6 +13,15 @@ public interface AcademicGroundingPolicy {
     /** Whether the student's message itself asks for personal or current academic facts (or names a course/section). */
     boolean messageRequiresAcademicEvidence(String message);
 
+    /** Step 15A: whether the student's message needs document evidence: a rules topic or a curriculum topic. */
+    boolean messageRequiresKnowledgeEvidence(String message);
+
+    /** Step 15A: whether the document search itself must run for this message: a topic that only a document can answer. */
+    boolean messageRequiresKnowledgeSearch(String message);
+
+    /** Step 16B: whether the student asks how they themselves stand against a requirement (spec file 57). */
+    boolean messageAsksAboutOwnStanding(String message);
+
     /** Whether a tool's result is academic evidence that the final answer must be checked against. */
     boolean toolRequiresGrounding(String toolName);
 

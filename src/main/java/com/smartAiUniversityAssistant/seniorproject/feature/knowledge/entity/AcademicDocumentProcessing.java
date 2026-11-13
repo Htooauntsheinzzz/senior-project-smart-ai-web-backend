@@ -19,4 +19,9 @@ public class AcademicDocumentProcessing {
     @Column(name = "last_error_code", length = 100) private String lastErrorCode;
     @Column(name = "last_error_message", length = 500) private String lastErrorMessage;
     @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt;
+    // Ingestion queue columns (spec file 46). Written by the worker and reprocess with conditional native updates.
+    @Column(name = "failed_stage", length = 20) private String failedStage;
+    @Column(name = "queued_at") private LocalDateTime queuedAt;
+    @Column(name = "queued_by") private Long queuedBy;
+    @Column(name = "next_attempt_at") private LocalDateTime nextAttemptAt;
 }

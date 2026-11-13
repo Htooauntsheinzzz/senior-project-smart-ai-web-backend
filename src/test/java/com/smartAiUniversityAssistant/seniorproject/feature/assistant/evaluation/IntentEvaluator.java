@@ -48,7 +48,7 @@ public final class IntentEvaluator {
         boolean ok = t.httpStatus() == 200 && t.message() != null && !t.message().isBlank();
         String answer = ok ? t.message() : "";
         boolean fallback = StudentAssistantServiceImpl.UNGROUNDED_FALLBACK_MESSAGE.equals(answer);
-        String evidence = t.toolResultsJson();
+        String evidence = withMeetingTimeRanges(t.toolResultsJson());
 
         Boolean toolCorrect = c.expectedTools().isEmpty() ? null : sameSet(actual, c.expectedTools());
         Boolean semanticTool = toolCorrect == null ? null
@@ -189,6 +189,20 @@ public final class IntentEvaluator {
             }
         }
         return false;
+    }
+
+    // Timetable meetings carry startTime and endTime as two fields ("09:00", "11:45"), while answers and the entity universe
+    // write the range "09:00-11:45". Each meeting's range is appended, so a range is supported exactly when one meeting
+    // of the evidence starts and ends at those times.
+    private static final Pattern MEETING_TIMES = Pattern.compile(
+            "\"startTime\"\\s*:\\s*\"(\\d{2}:\\d{2})[^\"]*\"\\s*,\\s*\"endTime\"\\s*:\\s*\"(\\d{2}:\\d{2})");
+
+    static String withMeetingTimeRanges(String evidence) {
+        if (evidence == null) return null;
+        var ranges = new StringBuilder(evidence);
+        var m = MEETING_TIMES.matcher(evidence);
+        while (m.find()) ranges.append(' ').append(m.group(1)).append('-').append(m.group(2));
+        return ranges.toString();
     }
 
     private List<String> unsupportedClaims(String answer, String evidence, String question) {

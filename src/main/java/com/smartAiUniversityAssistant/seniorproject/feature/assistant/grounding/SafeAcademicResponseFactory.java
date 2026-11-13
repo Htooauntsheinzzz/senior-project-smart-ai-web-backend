@@ -38,9 +38,23 @@ public interface SafeAcademicResponseFactory {
     /** Date-relative schedule questions that free-text schedules cannot answer. */
     String unsupportedScheduleReasoning();
 
+    /** Step 16B: appended when a hybrid answer failed the check. */
+    String degreeAuditReferral();
+
+    /** Step 15A: every search of the request found nothing. */
+    String knowledgeNotFound();
+
+    /** Step 15A: the document search failed and nothing else was verified. */
+    String knowledgeUnavailable();
+
+    /** Step 15A: a document question was answered without the document search. */
+    String knowledgeMissingEvidence();
+
     /**
      * A deterministic answer built only from the verified evidence. With none: the service-unavailable reply after a
-     * database failure, otherwise the missing-evidence reply.
+     * database failure, otherwise the missing-evidence reply. Step 15A: passages of the document search are quoted as
+     * the last part (at most two), or the search's not-found / unavailable reply when none was found. Step 16A: the
+     * progress totals of get_my_academic_progress are rendered too.
      */
     String groundedAnswer(List<AcademicEvidence> evidence);
 }

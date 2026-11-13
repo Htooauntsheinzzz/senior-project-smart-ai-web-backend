@@ -79,10 +79,13 @@ class StudentAssistantIntegrationTests extends IntegrationSupport {
                 .andExpect(jsonPath("createdAt").isString())
                 .andReturn();
         JsonNode body = json.readTree(result.getResponse().getContentAsByteArray());
-        // Only the five documented fields: no prompt, provider payload, key, conversation owner or student data.
+        // Only the documented fields: no prompt, provider payload, key, conversation owner or student data.
+        // Step 15A (D76): the additive sources array, always present and empty when no document was used.
         var names = new ArrayList<String>();
         body.propertyNames().forEach(names::add);
-        assertThat(names).containsExactlyInAnyOrder("message", "requestId", "conversationId", "model", "createdAt");
+        assertThat(names).containsExactlyInAnyOrder("message", "requestId", "conversationId", "model", "createdAt", "sources");
+        assertThat(body.get("sources").isArray()).isTrue();
+        assertThat(body.get("sources")).isEmpty();
         String raw = result.getResponse().getContentAsString();
         assertThat(raw).doesNotContain("chatcmpl-1").doesNotContain("systemPrompt").doesNotContain("studentId");
 
@@ -212,6 +215,9 @@ class StudentAssistantIntegrationTests extends IntegrationSupport {
     private void cleanDatabase() {
         db.update("DELETE FROM enrollments");
         db.update("DELETE FROM student_credentials");
+        // Step 17: stored assistant conversations reference the Student (no cascade, as everywhere in the schema).
+        db.update("DELETE FROM assistant_messages");
+        db.update("DELETE FROM assistant_conversations");
         db.update("DELETE FROM students");
         db.update("DELETE FROM app_user_roles WHERE user_id IN (SELECT id FROM app_users WHERE employee_id='AST-ACTOR')");
         db.update("DELETE FROM appuser_credentials WHERE user_id IN (SELECT id FROM app_users WHERE employee_id='AST-ACTOR')");

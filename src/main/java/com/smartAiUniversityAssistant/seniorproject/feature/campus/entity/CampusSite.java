@@ -13,8 +13,8 @@ public class CampusSite {
     @Column(name = "site_name", nullable = false, length = 200) private String siteName;
     @Column(name = "description", columnDefinition = "text") private String description;
     @Column(name = "timezone", nullable = false, length = 60) private String timezone;
-    @Column(name = "center_latitude", precision = 10, scale = 7) private BigDecimal centerLatitude;
-    @Column(name = "center_longitude", precision = 10, scale = 7) private BigDecimal centerLongitude;
+    @Column(name = "center_latitude", precision = 18, scale = 15) private BigDecimal centerLatitude;
+    @Column(name = "center_longitude", precision = 18, scale = 15) private BigDecimal centerLongitude;
     @Column(name = "is_active", nullable = false) private boolean active;
     @Column(name = "is_deleted", nullable = false) private boolean deleted;
     @Column(name = "created_by") private Long createdBy;

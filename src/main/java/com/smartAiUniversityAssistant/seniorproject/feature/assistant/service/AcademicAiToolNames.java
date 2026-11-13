@@ -10,6 +10,10 @@ public final class AcademicAiToolNames {
     public static final String GET_MY_COURSE_LECTURER = "get_my_course_lecturer";
     public static final String GET_COURSE_INFORMATION = "get_course_information";
     public static final String GET_SECTION_AVAILABILITY = "get_section_availability";
+    /** Step 16A: the Student's progress totals, declared only while AssistantProgressSettings.active(). */
+    public static final String GET_MY_ACADEMIC_PROGRESS = "get_my_academic_progress";
+    /** Step 15A: the document search, declared only while AssistantKnowledgeSettings.active(). */
+    public static final String SEARCH_UNIVERSITY_KNOWLEDGE = "search_university_knowledge";
 
     private AcademicAiToolNames() {
     }

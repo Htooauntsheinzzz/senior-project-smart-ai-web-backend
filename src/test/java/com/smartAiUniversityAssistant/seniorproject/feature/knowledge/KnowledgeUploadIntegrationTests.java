@@ -81,10 +81,9 @@ class KnowledgeUploadIntegrationTests extends KnowledgeIntegrationSupport {
                 .andExpect(jsonPath("processingDocuments").value(1)).andExpect(jsonPath("readyDocuments").value(0));
         perform(get(BASE + "/" + documentId + "/processing"), null).andExpect(status().isOk())
                 .andExpect(jsonPath("fileId").value(fileId)).andExpect(jsonPath("status").value("UPLOADED"))
-                .andExpect(jsonPath("attemptCount").value(0)).andExpect(jsonPath("startedAt").doesNotExist())
-                .andExpect(jsonPath("ingestionAvailable").value(false));
-        perform(post(BASE + "/" + documentId + "/reprocess"), null).andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("code").value("DOCUMENT_PROCESSING_NOT_AVAILABLE"));
+                .andExpect(jsonPath("attemptCount").value(0)).andExpect(jsonPath("startedAt").doesNotExist());
+        // Ingestion availability and reprocess are covered by DocumentIngestionIntegrationTests and
+        // KnowledgeIngestionDisabledIntegrationTests (spec file 46, section 20.3); the upload itself stays UPLOADED.
         assertThat(db.queryForObject("SELECT status FROM academic_document_processing WHERE file_id=?", String.class, fileId)).isEqualTo("UPLOADED");
     }
 

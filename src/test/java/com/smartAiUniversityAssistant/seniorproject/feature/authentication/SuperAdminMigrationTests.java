@@ -1,5 +1,6 @@
 package com.smartAiUniversityAssistant.seniorproject.feature.authentication;
 
+import com.smartAiUniversityAssistant.seniorproject.MigrationVersions;
 import com.smartAiUniversityAssistant.seniorproject.IntegrationSupport;
 import java.util.*;
 import org.flywaydb.core.Flyway;
@@ -21,7 +22,7 @@ class SuperAdminMigrationTests extends IntegrationSupport {
                 .cleanDisabled(false)
                 .load();
         try {
-            assertThat(flyway.migrate().migrationsExecuted).isEqualTo(47);
+            assertThat(flyway.migrate().migrationsExecuted).isEqualTo(MigrationVersions.count());
             var dataSource = new DriverManagerDataSource(
                     POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
             var db = new JdbcTemplate(dataSource);

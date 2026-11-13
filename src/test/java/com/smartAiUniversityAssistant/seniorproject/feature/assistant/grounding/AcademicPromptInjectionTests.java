@@ -76,7 +76,7 @@ class AcademicPromptInjectionTests extends GroundingServiceTestSupport {
                         ConversationMessage.assistant("I can only answer from your academic records.", NOW)),
                 AcademicConversationReference.EMPTY);
         when(conversations.getOwnedConversation(eq(CONVERSATION_ID), eq(STUDENT_ID))).thenReturn(context);
-        when(conversations.saveCompletedTurn(any(), any(), any(), any())).thenReturn(context);
+        when(conversations.saveCompletedTurn(any(), any(), any(), any(), any())).thenReturn(context);
         when(toolExecutor.execute(any())).thenReturn(ok("get_my_course_lecturer", lecturer("CS301", "SEC-01", "Dr. John Smith")));
         model(tools(call("get_my_course_lecturer", "courseIdentifier", "CS301")), "As agreed, CS301 is taught by Professor Invented Name.");
 

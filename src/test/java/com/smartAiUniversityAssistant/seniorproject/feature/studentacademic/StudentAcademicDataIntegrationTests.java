@@ -28,8 +28,10 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
     private static final String RESULTS = "/api/v1/admin/academic/course-results";
     private static final String ADMIN_PASSWORD = "academic data actor password";
     private static final String PASSWORD = "student academic data password";
-    // Wednesday 2026-11-04 10:00 in Bangkok.
-    private static final Instant WEDNESDAY_10_BANGKOK = Instant.parse("2026-11-04T03:00:00Z");
+    // Wednesday 2054-11-04 10:00 in Bangkok. The dates of this class were 2026 dates moved by 28 years (same weekdays and
+    // leap years): Redis expires a login session at the test clock's time plus 7 days in real time, so a pinned date
+    // more than a week in the past logged every request out (401) from 2026-11-11 on.
+    private static final Instant WEDNESDAY_10_BANGKOK = Instant.parse("2054-11-04T03:00:00Z");
 
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
@@ -64,8 +66,8 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
         past = id("INSERT INTO semesters(academic_year,semester_name_th,semester_name_en,created_by) VALUES (2025,'เทอม 1','Semester 1',?) RETURNING id", actor);
         current = id("INSERT INTO semesters(academic_year,semester_name_th,semester_name_en,created_by) VALUES (2026,'เทอม 1','Semester 1',?) RETURNING id", actor);
         // Spec file 42: sections need an academic term and published meetings need a campus room.
-        term(past, "2568", "2025-08-01", "2025-12-31");
-        term(current, "2569", "2026-08-01", "2027-05-31");
+        term(past, "2568", "2053-08-01", "2053-12-31");
+        term(current, "2569", "2054-08-01", "2055-05-31");
         site = id("INSERT INTO campus_sites(site_code,site_name) VALUES ('MAIN','Main Campus') RETURNING id");
         building = id("INSERT INTO campus_buildings(site_id,building_code,building_name,total_floors) VALUES (?,'B11','Building 11',12) RETURNING id", site);
         room1103 = room("1103");
@@ -212,8 +214,8 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
         String admin = admin();
         finalized(admin, enroll(studentA, sectionA, "ACTIVE"), gradeA);
         enroll(studentB, sectionB, "ACTIVE");
-        meeting(sectionA, 5, "09:00", "11:45", "2026-08-01", "2026-12-31", "1103", true);
-        assignment(sectionA, "A's work", "2026-11-05T12:00:00+07:00", "PUBLISHED");
+        meeting(sectionA, 5, "09:00", "11:45", "2054-08-01", "2054-12-31", "1103", true);
+        assignment(sectionA, "A's work", "2054-11-05T12:00:00+07:00", "PUBLISHED");
         String token = student("6600102");
         get(token, ACADEMIC + "/progress")
                 .andExpect(jsonPath("$.cgpa").value(org.hamcrest.Matchers.nullValue()))
@@ -317,7 +319,7 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
         post(admin, base, meetingBody("LAB", 8, "09:00", "10:00")).andExpect(status().isBadRequest());
         post(admin, base, meetingBody("SEMINAR", 2, "09:00", "10:00")).andExpect(status().isBadRequest());
         var badDates = new HashMap<>(meetingBody("LAB", 2, "09:00", "10:00"));
-        badDates.put("effectiveTo", "2026-01-01");
+        badDates.put("effectiveTo", "2054-01-01");
         post(admin, base, badDates).andExpect(status().isBadRequest());
         var room = new HashMap<>(meetingBody("LAB", 2, "09:00", "10:00"));
         room.put("roomId", 999999);
@@ -344,9 +346,9 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
     @Test
     void coursesAndScheduleListMeetingsAndLegacyFieldsStay() throws Exception {
         enroll(studentA, sectionA, "ACTIVE");
-        meeting(sectionA, 3, "09:00", "11:45", "2026-08-01", "2026-12-31", "Lab 1108", true);
-        meeting(sectionA, 1, "09:00", "11:45", "2026-08-01", "2026-12-31", "1103", true);
-        meeting(sectionA, 5, "09:00", "11:45", "2026-08-01", "2026-12-31", "hidden", false);
+        meeting(sectionA, 3, "09:00", "11:45", "2054-08-01", "2054-12-31", "Lab 1108", true);
+        meeting(sectionA, 1, "09:00", "11:45", "2054-08-01", "2054-12-31", "1103", true);
+        meeting(sectionA, 5, "09:00", "11:45", "2054-08-01", "2054-12-31", "hidden", false);
         String token = student("6600101");
         get(token, ACADEMIC + "/courses").andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].courseCode").value("CSC-452"))
@@ -373,8 +375,8 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
         enroll(studentA, sectionB, "ACTIVE");
         enroll(studentA, sectionC, "ACTIVE");
         // Two meetings on one section must not add its credits twice.
-        meeting(sectionA, 1, "09:00", "11:45", "2026-08-01", "2026-12-31", "1103", true);
-        meeting(sectionA, 3, "09:00", "11:45", "2026-08-01", "2026-12-31", "1108", true);
+        meeting(sectionA, 1, "09:00", "11:45", "2054-08-01", "2054-12-31", "1103", true);
+        meeting(sectionA, 3, "09:00", "11:45", "2054-08-01", "2054-12-31", "1108", true);
         String token = student("6600101");
         get(token, ACADEMIC + "/courses/summary").andExpect(status().isOk())
                 .andExpect(jsonPath("$.semester.id").value(current))
@@ -394,15 +396,15 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
     void nextClassPicksTheEarliestFutureMeeting() throws Exception {
         enroll(studentA, sectionA, "ACTIVE");
         enroll(studentA, sectionB, "ACTIVE");
-        meeting(sectionA, 1, "09:00", "11:45", "2026-08-01", "2026-12-31", "1103", true);
-        meeting(sectionB, 5, "13:00", "14:00", "2026-08-01", "2026-12-31", "B-201", true);
+        meeting(sectionA, 1, "09:00", "11:45", "2054-08-01", "2054-12-31", "1103", true);
+        meeting(sectionB, 5, "13:00", "14:00", "2054-08-01", "2054-12-31", "B-201", true);
         String token = student("6600101");
         get(token, ACADEMIC + "/next-class").andExpect(status().isOk())
                 .andExpect(jsonPath("$.courseCode").value("CSC-311"))
                 .andExpect(jsonPath("$.meetingType").value("LECTURE"))
                 .andExpect(jsonPath("$.dayOfWeek").value("FRIDAY"))
-                .andExpect(jsonPath("$.startsAt").value("2026-11-06T13:00:00+07:00"))
-                .andExpect(jsonPath("$.endsAt").value("2026-11-06T14:00:00+07:00"))
+                .andExpect(jsonPath("$.startsAt").value("2054-11-06T13:00:00+07:00"))
+                .andExpect(jsonPath("$.endsAt").value("2054-11-06T14:00:00+07:00"))
                 .andExpect(jsonPath("$.roomName").value("B-201"))
                 .andExpect(jsonPath("$.roomNumber").value("B-201"))
                 .andExpect(jsonPath("$.buildingName").value("Building 11"))
@@ -411,30 +413,30 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
                 .andExpect(jsonPath("$.status").value("UPCOMING"))
                 .andExpect(jsonPath("$.occurrenceStatus").value("REGULAR"))
                 .andExpect(jsonPath("$.scheduleBasis").value("PUBLISHED_TIMETABLE"));
-        clock.set(Instant.parse("2026-11-07T00:00:00Z")); // Saturday morning: both this week's are gone
+        clock.set(Instant.parse("2054-11-07T00:00:00Z")); // Saturday morning: both this week's are gone
         token = student("6600101");
         get(token, ACADEMIC + "/next-class").andExpect(jsonPath("$.courseCode").value("CSC-452"))
-                .andExpect(jsonPath("$.startsAt").value("2026-11-09T09:00:00+07:00"))
+                .andExpect(jsonPath("$.startsAt").value("2054-11-09T09:00:00+07:00"))
                 .andExpect(jsonPath("$.roomName").value("1103"));
     }
 
     @Test
     void nextClassUsesBangkokDayAndSkipsAStartedClass() throws Exception {
         enroll(studentA, sectionA, "ACTIVE");
-        meeting(sectionA, 1, "09:00", "11:45", "2026-08-01", "2026-12-31", "1103", true);
+        meeting(sectionA, 1, "09:00", "11:45", "2054-08-01", "2054-12-31", "1103", true);
         String token = student("6600101");
         // Sunday 23:30 UTC is already Monday 06:30 in Bangkok, so the class is today, not in a week.
-        clock.set(Instant.parse("2026-11-08T23:30:00Z"));
+        clock.set(Instant.parse("2054-11-08T23:30:00Z"));
         token = student("6600101");
         get(token, ACADEMIC + "/next-class")
-                .andExpect(jsonPath("$.startsAt").value("2026-11-09T09:00:00+07:00"))
+                .andExpect(jsonPath("$.startsAt").value("2054-11-09T09:00:00+07:00"))
                 .andExpect(jsonPath("$.minutesUntilStart").value(150));
-        clock.set(Instant.parse("2026-11-09T02:30:00Z")); // Monday 09:30 in Bangkok: in progress
+        clock.set(Instant.parse("2054-11-09T02:30:00Z")); // Monday 09:30 in Bangkok: in progress
         token = student("6600101");
-        get(token, ACADEMIC + "/next-class").andExpect(jsonPath("$.startsAt").value("2026-11-16T09:00:00+07:00"));
-        clock.set(Instant.parse("2026-11-09T05:00:00Z")); // Monday 12:00 in Bangkok: ended
+        get(token, ACADEMIC + "/next-class").andExpect(jsonPath("$.startsAt").value("2054-11-16T09:00:00+07:00"));
+        clock.set(Instant.parse("2054-11-09T05:00:00Z")); // Monday 12:00 in Bangkok: ended
         token = student("6600101");
-        get(token, ACADEMIC + "/next-class").andExpect(jsonPath("$.startsAt").value("2026-11-16T09:00:00+07:00"));
+        get(token, ACADEMIC + "/next-class").andExpect(jsonPath("$.startsAt").value("2054-11-16T09:00:00+07:00"));
     }
 
     @Test
@@ -443,12 +445,12 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
         String token = student("6600101");
         get(token, ACADEMIC + "/next-class").andExpect(status().isOk()).andExpect(content().string("null"))
                 .andExpect(header().string("Cache-Control", "no-store"));
-        meeting(sectionA, 5, "09:00", "10:00", "2026-08-01", "2026-12-31", "inactive", false);
-        meeting(sectionA, 4, "09:00", "10:00", "2026-01-01", "2026-06-30", "ended", true);
-        meeting(sectionA, 3, "12:00", "13:00", "2027-01-01", "2027-03-31", "future term", true);
-        long deleted = meeting(sectionA, 2, "09:00", "10:00", "2026-08-01", "2026-12-31", "deleted", true);
+        meeting(sectionA, 5, "09:00", "10:00", "2054-08-01", "2054-12-31", "inactive", false);
+        meeting(sectionA, 4, "09:00", "10:00", "2054-01-01", "2054-06-30", "ended", true);
+        meeting(sectionA, 3, "12:00", "13:00", "2055-01-01", "2055-03-31", "future term", true);
+        long deleted = meeting(sectionA, 2, "09:00", "10:00", "2054-08-01", "2054-12-31", "deleted", true);
         db.update("UPDATE course_section_meetings SET is_deleted=TRUE WHERE id=?", deleted);
-        get(token, ACADEMIC + "/next-class").andExpect(jsonPath("$.startsAt").value("2027-01-06T12:00:00+07:00"));
+        get(token, ACADEMIC + "/next-class").andExpect(jsonPath("$.startsAt").value("2055-01-06T12:00:00+07:00"));
         db.update("UPDATE course_sections SET status='CLOSED' WHERE id=?", sectionA);
         get(token, ACADEMIC + "/next-class").andExpect(content().string("null"));
         db.update("UPDATE course_sections SET status='ACTIVE' WHERE id=?", sectionA);
@@ -462,15 +464,15 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
     void deadlinesMergeSortAndHideWhatStudentsShouldNotSee() throws Exception {
         enroll(studentA, sectionA, "ACTIVE");
         enroll(studentA, sectionB, "ACTIVE");
-        assignment(sectionA, "Draft work", "2026-11-05T12:00:00+07:00", "DRAFT");
-        assignment(sectionA, "Closed work", "2026-11-05T12:00:00+07:00", "CLOSED");
-        long late = assignment(sectionA, "Later work", "2026-11-20T23:59:00+07:00", "PUBLISHED");
-        assignment(sectionOther, "Not my section", "2026-11-05T12:00:00+07:00", "PUBLISHED");
-        assignment(sectionB, "Past work", "2026-11-01T12:00:00+07:00", "PUBLISHED");
-        long today = assignment(sectionB, "Tonight", "2026-11-04T23:59:00+07:00", "PUBLISHED");
-        long midterm = exam(sectionA, "Midterm", "2026-11-06T09:00:00+07:00", "SCHEDULED");
-        exam(sectionA, "Cancelled exam", "2026-11-06T10:00:00+07:00", "CANCELLED");
-        exam(sectionA, "Draft exam", "2026-11-06T11:00:00+07:00", "DRAFT");
+        assignment(sectionA, "Draft work", "2054-11-05T12:00:00+07:00", "DRAFT");
+        assignment(sectionA, "Closed work", "2054-11-05T12:00:00+07:00", "CLOSED");
+        long late = assignment(sectionA, "Later work", "2054-11-20T23:59:00+07:00", "PUBLISHED");
+        assignment(sectionOther, "Not my section", "2054-11-05T12:00:00+07:00", "PUBLISHED");
+        assignment(sectionB, "Past work", "2054-11-01T12:00:00+07:00", "PUBLISHED");
+        long today = assignment(sectionB, "Tonight", "2054-11-04T23:59:00+07:00", "PUBLISHED");
+        long midterm = exam(sectionA, "Midterm", "2054-11-06T09:00:00+07:00", "SCHEDULED");
+        exam(sectionA, "Cancelled exam", "2054-11-06T10:00:00+07:00", "CANCELLED");
+        exam(sectionA, "Draft exam", "2054-11-06T11:00:00+07:00", "DRAFT");
         String token = student("6600101");
         get(token, ACADEMIC + "/deadlines").andExpect(status().isOk())
                 .andExpect(jsonPath("$.total").value(3))
@@ -478,33 +480,33 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
                 .andExpect(jsonPath("$.items[0].id").value(today))
                 .andExpect(jsonPath("$.items[0].type").value("ASSIGNMENT"))
                 .andExpect(jsonPath("$.items[0].courseCode").value("CSC-311"))
-                .andExpect(jsonPath("$.items[0].deadlineAt").value("2026-11-04T23:59:00+07:00"))
+                .andExpect(jsonPath("$.items[0].deadlineAt").value("2054-11-04T23:59:00+07:00"))
                 .andExpect(jsonPath("$.items[0].status").value("UPCOMING"))
                 .andExpect(jsonPath("$.items[1].id").value(midterm))
                 .andExpect(jsonPath("$.items[1].type").value("EXAM"))
-                .andExpect(jsonPath("$.items[1].deadlineAt").value("2026-11-06T09:00:00+07:00"))
+                .andExpect(jsonPath("$.items[1].deadlineAt").value("2054-11-06T09:00:00+07:00"))
                 .andExpect(jsonPath("$.items[2].id").value(late));
         // total keeps counting past the limit, and a narrower window narrows both.
         get(token, ACADEMIC + "/deadlines?limit=1").andExpect(jsonPath("$.total").value(3)).andExpect(jsonPath("$.items.length()").value(1));
-        get(token, ACADEMIC + "/deadlines?from=2026-11-05T00:00:00%2B07:00&to=2026-11-10T00:00:00%2B07:00")
+        get(token, ACADEMIC + "/deadlines?from=2054-11-05T00:00:00%2B07:00&to=2054-11-10T00:00:00%2B07:00")
                 .andExpect(jsonPath("$.total").value(1)).andExpect(jsonPath("$.items[0].id").value(midterm));
         get(token, ACADEMIC + "/deadlines?limit=0").andExpect(status().isBadRequest());
         get(token, ACADEMIC + "/deadlines?limit=101").andExpect(status().isBadRequest());
         get(token, ACADEMIC + "/deadlines?limit=abc").andExpect(status().isBadRequest());
         get(token, ACADEMIC + "/deadlines?from=not-a-date").andExpect(status().isBadRequest());
-        get(token, ACADEMIC + "/deadlines?from=2026-11-10T00:00:00%2B07:00&to=2026-11-05T00:00:00%2B07:00").andExpect(status().isBadRequest());
-        get(token, ACADEMIC + "/deadlines?from=2026-01-01T00:00:00%2B07:00&to=2028-01-01T00:00:00%2B07:00").andExpect(status().isBadRequest());
+        get(token, ACADEMIC + "/deadlines?from=2054-11-10T00:00:00%2B07:00&to=2054-11-05T00:00:00%2B07:00").andExpect(status().isBadRequest());
+        get(token, ACADEMIC + "/deadlines?from=2054-01-01T00:00:00%2B07:00&to=2056-01-01T00:00:00%2B07:00").andExpect(status().isBadRequest());
     }
 
     @Test
     void dueTodayFollowsTheBangkokCalendarDay() throws Exception {
         enroll(studentA, sectionA, "ACTIVE");
-        // 2026-11-04 17:30 UTC is 00:30 on 2026-11-05 in Bangkok.
-        assignment(sectionA, "Bangkok tomorrow, UTC today", "2026-11-04T17:30:00Z", "PUBLISHED");
-        assignment(sectionA, "Last minute of the Bangkok day", "2026-11-04T16:59:00Z", "PUBLISHED");
+        // 2054-11-04 17:30 UTC is 00:30 on 2054-11-05 in Bangkok.
+        assignment(sectionA, "Bangkok tomorrow, UTC today", "2054-11-04T17:30:00Z", "PUBLISHED");
+        assignment(sectionA, "Last minute of the Bangkok day", "2054-11-04T16:59:00Z", "PUBLISHED");
         String token = student("6600101");
         get(token, ACADEMIC + "/deadlines").andExpect(jsonPath("$.dueTodayCount").value(1)).andExpect(jsonPath("$.total").value(2));
-        clock.set(Instant.parse("2026-11-04T17:00:00Z")); // Bangkok has moved to the 5th
+        clock.set(Instant.parse("2054-11-04T17:00:00Z")); // Bangkok has moved to the 5th
         token = student("6600101");
         get(token, ACADEMIC + "/deadlines").andExpect(jsonPath("$.dueTodayCount").value(1)).andExpect(jsonPath("$.total").value(1));
     }
@@ -521,10 +523,10 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
     void assignmentAndExamAdministrationFollowsTheirStatuses() throws Exception {
         String admin = admin();
         String assignments = "/api/v1/admin/assignments";
-        var body = new HashMap<String, Object>(Map.of("courseSectionId", sectionA, "title", " Prototype ", "dueAt", "2026-11-10T23:59:00+07:00"));
+        var body = new HashMap<String, Object>(Map.of("courseSectionId", sectionA, "title", " Prototype ", "dueAt", "2054-11-10T23:59:00+07:00"));
         long assignment = idOf(post(admin, assignments, body).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("DRAFT")).andExpect(jsonPath("$.title").value("Prototype"))
-                .andExpect(jsonPath("$.dueAt").value("2026-11-10T23:59:00+07:00")));
+                .andExpect(jsonPath("$.dueAt").value("2054-11-10T23:59:00+07:00")));
         enroll(studentA, sectionA, "ACTIVE");
         String token = student("6600101");
         get(token, ACADEMIC + "/deadlines").andExpect(jsonPath("$.total").value(0));
@@ -545,11 +547,11 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
 
         String exams = "/api/v1/admin/exams";
         var exam = new HashMap<String, Object>(Map.of("courseSectionId", sectionA, "title", "Midterm", "examType", "MIDTERM",
-                "startsAt", "2026-11-12T09:00:00+07:00", "endsAt", "2026-11-12T11:00:00+07:00"));
+                "startsAt", "2054-11-12T09:00:00+07:00", "endsAt", "2054-11-12T11:00:00+07:00"));
         long examId = idOf(post(admin, exams, exam).andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("DRAFT")));
-        exam.put("endsAt", "2026-11-12T08:00:00+07:00");
+        exam.put("endsAt", "2054-11-12T08:00:00+07:00");
         post(admin, exams, exam).andExpect(status().isBadRequest());
-        exam.put("endsAt", "2026-11-12T11:00:00+07:00");
+        exam.put("endsAt", "2054-11-12T11:00:00+07:00");
         exam.put("examType", "ORAL");
         post(admin, exams, exam).andExpect(status().isBadRequest());
         post(admin, exams + "/" + examId + "/complete", Map.of()).andExpect(status().isConflict());
@@ -567,9 +569,9 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
     @Test
     void homeSummaryAggregatesTheSameServices() throws Exception {
         enroll(studentA, sectionA, "ACTIVE");
-        meeting(sectionA, 1, "09:00", "11:45", "2026-08-01", "2026-12-31", "1103", true);
-        for (int i = 1; i <= 6; i++) assignment(sectionA, "Work " + i, "2026-11-1" + i + "T12:00:00+07:00", "PUBLISHED");
-        assignment(sectionA, "Tonight", "2026-11-04T23:00:00+07:00", "PUBLISHED");
+        meeting(sectionA, 1, "09:00", "11:45", "2054-08-01", "2054-12-31", "1103", true);
+        for (int i = 1; i <= 6; i++) assignment(sectionA, "Work " + i, "2054-11-1" + i + "T12:00:00+07:00", "PUBLISHED");
+        assignment(sectionA, "Tonight", "2054-11-04T23:00:00+07:00", "PUBLISHED");
         String token = student("6600101");
         var home = get(token, "/api/v1/student/home/summary").andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
@@ -577,7 +579,7 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
                 .andExpect(jsonPath("$.student.programName").value("Computer Science"))
                 .andExpect(jsonPath("$.student.studyYear").value(3))
                 .andExpect(jsonPath("$.nextClass.courseCode").value("CSC-452"))
-                .andExpect(jsonPath("$.nextClass.startsAt").value("2026-11-09T09:00:00+07:00"))
+                .andExpect(jsonPath("$.nextClass.startsAt").value("2054-11-09T09:00:00+07:00"))
                 .andExpect(jsonPath("$.deadlines.dueTodayCount").value(1))
                 .andExpect(jsonPath("$.deadlines.total").value(7))
                 .andExpect(jsonPath("$.deadlines.items.length()").value(5));
@@ -666,7 +668,7 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
                 scheme, code, point, gpa, earns, passing);
     }
     private long enroll(long student, long section, String status) {
-        return id("INSERT INTO enrollments(student_id,course_section_id,enrollment_date,status,created_by) VALUES (?,?,DATE '2026-08-15',?,?) RETURNING id",
+        return id("INSERT INTO enrollments(student_id,course_section_id,enrollment_date,status,created_by) VALUES (?,?,DATE '2054-08-15',?,?) RETURNING id",
                 student, section, status, actor);
     }
     // room is a campus room number (created on demand); active=true is a PUBLISHED meeting, false a DRAFT.
@@ -686,7 +688,7 @@ class StudentAcademicDataIntegrationTests extends IntegrationSupport {
     }
     private Map<String, Object> meetingBody(String type, int day, String start, String end) {
         return Map.of("meetingType", type, "dayOfWeek", day, "startTime", start, "endTime", end,
-                "effectiveFrom", "2026-08-01", "effectiveTo", "2026-12-31", "roomId", room1103, "roomLabel", "1103");
+                "effectiveFrom", "2054-08-01", "effectiveTo", "2054-12-31", "roomId", room1103, "roomLabel", "1103");
     }
     private ResultActions create(String token, long enrollment, long grade) throws Exception {
         return post(token, RESULTS, Map.of("enrollmentId", enrollment, "gradeDefinitionId", grade));

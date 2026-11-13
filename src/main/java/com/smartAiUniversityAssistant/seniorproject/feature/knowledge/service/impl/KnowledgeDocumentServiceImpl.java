@@ -13,6 +13,7 @@ import com.smartAiUniversityAssistant.seniorproject.feature.knowledge.mapper.Kno
 import com.smartAiUniversityAssistant.seniorproject.feature.knowledge.mapper.KnowledgeDocumentMapper.CurrentFile;
 import com.smartAiUniversityAssistant.seniorproject.feature.knowledge.repository.*;
 import com.smartAiUniversityAssistant.seniorproject.feature.knowledge.enums.DocumentProcessingStatus;
+import com.smartAiUniversityAssistant.seniorproject.feature.knowledge.enums.ReprocessMode;
 import com.smartAiUniversityAssistant.seniorproject.feature.knowledge.service.*;
 import com.smartAiUniversityAssistant.seniorproject.feature.knowledge.service.FileStorageService.StoredFile;
 import com.smartAiUniversityAssistant.seniorproject.feature.knowledge.service.KnowledgeFileValidator.ValidatedFile;
@@ -58,12 +59,14 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
     private final FileStorageService storage;
     private final KnowledgeStorageProperties properties;
     private final TransactionTemplate transaction;
+    private final DocumentIngestionService ingestion;
 
     public KnowledgeDocumentServiceImpl(AcademicDocumentRepository documents, AcademicDocumentFileRepository files,
             DocumentCategoryRepository categories, CurriculumVersionRepository curriculums, ProgramRepository programs,
             DepartmentRepository departments, KnowledgeDocumentMapper mapper, Clock clock, EntityManager entityManager,
             AcademicDocumentProcessingRepository processingRecords, KnowledgeFileValidator validator,
-            FileStorageService storage, KnowledgeStorageProperties properties, PlatformTransactionManager transactions) {
+            FileStorageService storage, KnowledgeStorageProperties properties, PlatformTransactionManager transactions,
+            DocumentIngestionService ingestion) {
         this.documents = documents;
         this.files = files;
         this.categories = categories;
@@ -79,6 +82,7 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
         this.properties = properties;
         this.transaction = new TransactionTemplate(transactions);
         this.transaction.setTimeout(15);
+        this.ingestion = ingestion;
     }
 
     @Override @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ, timeout = 15)
@@ -249,27 +253,15 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
         requireFull(actor);
         positiveId(id);
         documents.findByIdAndDeletedFalse(id).orElseThrow(KnowledgeFailure::documentNotFound);
-        AcademicDocumentFile file = files.findByDocumentIdAndCurrentTrue(id).orElseThrow(KnowledgeFailure::fileNotFound);
-        AcademicDocumentProcessing processing = processingRecords.findByFileId(file.getId()).orElseThrow(KnowledgeFailure::fileNotFound);
-        String message = switch (processing.getStatus()) {
-            case UPLOADED -> "Awaiting AI processing. Document ingestion is not available yet.";
-            case READY -> "Indexed and ready for AI retrieval.";
-            case FAILED -> "Processing failed.";
-            default -> "Processing is in progress.";
-        };
-        return new KnowledgeDocumentProcessingResponse(id, file.getId(), file.getRevisionNumber(), processing.getStatus().name(),
-                processing.getAttemptCount(), instant(processing.getStartedAt()), instant(processing.getCompletedAt()),
-                processing.getLastErrorCode(), false, message);
+        return ingestion.describe(id);
     }
 
-    @Override @Transactional(readOnly = true, timeout = 15)
-    public void reprocess(AuthenticatedUser actor, long id) {
+    /** Admin authorization stays here; the worker queues the current file (spec file 46, section 14). */
+    @Override
+    public KnowledgeDocumentProcessingResponse reprocess(AuthenticatedUser actor, long id, ReprocessMode mode) {
         requireFull(actor);
         positiveId(id);
-        documents.findByIdAndDeletedFalse(id).orElseThrow(KnowledgeFailure::documentNotFound);
-        files.findByDocumentIdAndCurrentTrue(id).orElseThrow(KnowledgeFailure::fileNotFound);
-        // No ingestion worker exists yet, so nothing can be queued; the status is left unchanged.
-        throw KnowledgeFailure.processingNotAvailable();
+        return ingestion.requestProcessing(id, actor.userId(), mode);
     }
 
     /** Commits metadata for an already stored file, deleting the file again when the commit does not happen. */

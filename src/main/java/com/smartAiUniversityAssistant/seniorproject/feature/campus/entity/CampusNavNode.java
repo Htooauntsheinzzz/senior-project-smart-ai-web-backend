@@ -16,8 +16,8 @@ public class CampusNavNode {
     @Column(name = "node_name", nullable = false, length = 200) private String nodeName;
     @Enumerated(EnumType.STRING)
     @Column(name = "node_type", nullable = false, length = 30) private CampusNodeType nodeType;
-    @Column(name = "latitude", nullable = false, precision = 10, scale = 7) private BigDecimal latitude;
-    @Column(name = "longitude", nullable = false, precision = 10, scale = 7) private BigDecimal longitude;
+    @Column(name = "latitude", nullable = false, precision = 18, scale = 15) private BigDecimal latitude;
+    @Column(name = "longitude", nullable = false, precision = 18, scale = 15) private BigDecimal longitude;
     @Column(name = "is_accessible", nullable = false) private boolean accessible;
     @Column(name = "is_active", nullable = false) private boolean active;
     @Column(name = "is_deleted", nullable = false) private boolean deleted;

@@ -288,7 +288,9 @@ class CampusAdminIntegrationTests extends CampusIntegrationSupport {
         call(superToken, post(ADMIN + "/navigation/nodes"), with(base, "latitude", 91)).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("CAMPUS_INVALID_COORDINATES"));
         call(superToken, post(ADMIN + "/navigation/nodes"), with(base, "longitude", -181)).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("CAMPUS_INVALID_COORDINATES"));
         call(superToken, post(ADMIN + "/navigation/nodes"), with(base, "latitude", null)).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("CAMPUS_INVALID_COORDINATES"));
-        call(superToken, post(ADMIN + "/navigation/nodes"), with(base, "latitude", 13.12345678)).andExpect(status().isBadRequest());
+        call(superToken, post(ADMIN + "/navigation/nodes"), with(base, "latitude", new java.math.BigDecimal("13.1234567890123456"))).andExpect(status().isBadRequest());
+        call(superToken, post(ADMIN + "/navigation/nodes"), with(base, "nodeCode", "FULL-PRECISION", "latitude", new java.math.BigDecimal("13.964438098079592"), "longitude", new java.math.BigDecimal("100.5866727383530")))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.latitude").value(13.964438098079592)).andExpect(jsonPath("$.longitude").value(100.586672738353));
         call(superToken, post(ADMIN + "/navigation/nodes"), with(base, "nodeType", "PORTAL")).andExpect(status().isBadRequest());
         long b = tree(call(superToken, post(ADMIN + "/navigation/nodes"), base).andExpect(status().isCreated()).andReturn()).get("id").asLong();
         call(superToken, put(ADMIN + "/navigation/nodes/" + b), body("nodeCode", "N2", "nodeName", "Renamed", "nodeType", "GATE", "latitude", 13.2, "longitude", 100.2, "isActive", false))

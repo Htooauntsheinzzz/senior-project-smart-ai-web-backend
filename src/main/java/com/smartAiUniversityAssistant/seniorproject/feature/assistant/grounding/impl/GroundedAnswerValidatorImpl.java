@@ -2,6 +2,8 @@ package com.smartAiUniversityAssistant.seniorproject.feature.assistant.grounding
 
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.grounding.*;
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.grounding.GroundingValidationResult.Outcome;
+import com.smartAiUniversityAssistant.seniorproject.feature.assistant.service.AcademicAiToolNames;
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -18,6 +20,22 @@ import org.springframework.stereotype.Component;
  * are not judged: this is not a semantic hallucination detector, only a deterministic check of known value types.
  * Redis conversation history is never evidence, so a room remembered from an earlier answer fails if PostgreSQL now
  * returns another one.
+ * <p>
+ * Step 15A: a passage of search_university_knowledge that was really retrieved (VERIFIED) supports the values written in
+ * it: its whole numbers and number words as credits, seats, sections and semesters, its rooms and pages, its names, its
+ * program names, the years of its academic year and its grade point averages. Only while such document evidence is
+ * present, credit totals with three digits (CREDITS_WIDE) and grade point averages (GPA) are claims too. Without it the
+ * check is exactly the Step 11 check. Amounts of money, percentages and numbers of days are still not checked.
+ * <p>
+ * Step 16A: a VERIFIED result of get_my_academic_progress adds its earned and current credits and its grade point
+ * average as facts and also switches on the wide credit and GPA claims. While it is present, a claim about the
+ * Student's standing (STANDING: "you are eligible", "you have met all …", "you will graduate") is always unsupported,
+ * because no evidence can support it. STANDING is a phrase list: paraphrases and Myanmar wordings are not caught.
+ * <p>
+ * Step 16B: "114 more credits" is a credit claim too (CREDITS_MORE), and with VERIFIED progress and VERIFIED passages in the
+ * same request three derived credit values are facts: earned + current, |p − earned| and |p − (earned + current)|, where p
+ * is a whole number of a passage that the answer also states. Whether the compared requirement is the right one is not
+ * checked.
  */
 @Component
 public class GroundedAnswerValidatorImpl implements GroundedAnswerValidator {
@@ -28,6 +46,31 @@ public class GroundedAnswerValidatorImpl implements GroundedAnswerValidator {
     private static final String NUMBER_WORD = "\\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve";
     private static final Pattern CREDITS = Pattern.compile("(?i)(?<![\\w.])(" + NUMBER_WORD + ")\\s*-?\\s*(?:credit|หน่วยกิต|ခရက်ဒစ်)");
     private static final Pattern CREDITS_AFTER = Pattern.compile("(?i)(?<![a-z])credit(?:s|\\s*-?\\s*hours?)?\\s*(?:is|are|of|:|=)?\\s*(\\d{1,2})(?![\\d:-]|\\.\\d)");
+    // Step 15A: the same credit patterns with three digits, used instead of CREDITS/CREDITS_AFTER with document evidence.
+    private static final Pattern CREDITS_WIDE = Pattern.compile("(?i)(?<![\\w.])(\\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\\s*-?\\s*(?:credit|หน่วยกิต|ခရက်ဒစ်)");
+    private static final Pattern CREDITS_AFTER_WIDE = Pattern.compile("(?i)(?<![a-z])credit(?:s|\\s*-?\\s*hours?)?\\s*(?:is|are|of|:|=)?\\s*(\\d{1,3})(?![\\d:-]|\\.\\d)");
+    // Step 16B: a number, then more/additional/remaining/further/outstanding, then credits.
+    private static final Pattern CREDITS_MORE = Pattern.compile("(?i)(?<![\\w.])(\\d{1,3})\\s+(?:more|additional|remaining|further|outstanding)"
+            + "\\s+(?:credit|หน่วยกิต|ခရက်ဒစ်)");
+    private static final Pattern GPA_AFTER = Pattern.compile("(?i)(?<![a-z])(?:c?gpax?|grade[\\s-]point\\s+average|เกรดเฉลี่ย(?:สะสม)?|ผลการเรียนเฉลี่ย(?:สะสม)?)[^\\d\\n]{0,40}?([0-4]\\.\\d{1,2})(?!\\d)");
+    private static final Pattern GPA_BEFORE = Pattern.compile("(?i)(?<![\\d.])([0-4]\\.\\d{1,2})\\s*(?:c?gpax?|grade[\\s-]point\\s+average)(?![a-z])");
+    // Facts of a passage: whole numbers (not the digits of a decimal number), number and ordinal words, decimal GPAs.
+    private static final Pattern WHOLE_NUMBER = Pattern.compile("(?<![\\d.])(\\d{1,6})(?!\\d|\\.\\d)");
+    private static final Pattern NUMBER_WORDS = Pattern.compile("(?i)(?<![a-z])(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|"
+            + "first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth)(?![a-z])");
+    private static final Pattern GPA_VALUE = Pattern.compile("(?<![\\d.])([0-4]\\.\\d{1,2})(?!\\d)");
+    private static final Pattern ACADEMIC_YEAR = Pattern.compile("^\\s*(\\d{4})-(\\d{4})\\s*$");
+    private static final Map<String, Integer> ORDINALS = Map.ofEntries(Map.entry("first", 1), Map.entry("second", 2),
+            Map.entry("third", 3), Map.entry("fourth", 4), Map.entry("fifth", 5), Map.entry("sixth", 6), Map.entry("seventh", 7),
+            Map.entry("eighth", 8), Map.entry("ninth", 9), Map.entry("tenth", 10), Map.entry("eleventh", 11), Map.entry("twelfth", 12));
+    // Step 16A: claims about the Student's standing. Not after "before/until/whether/if/once/when/that".
+    private static final Pattern STANDING_EN = Pattern.compile("(?i)(?<!(?:before|until|whether|if|once|when|that)\\s)(?<![a-z])you"
+            + "(?:'re|’re|\\s+are|\\s+have|'ve|’ve)?\\s+(?:now\\s+|already\\s+)?(?:eligible|qualified|(?:met|meet|satisfied|fulfilled|completed)"
+            + "\\s+(?:all|every)(?![a-z])|on\\s+track\\s+to\\s+graduate)");
+    private static final Pattern STANDING_GRAD = Pattern.compile(
+            "(?i)(?<!(?:before|until|whether|if|once|when|that)\\s)(?<![a-z])you\\s+(?:will|can|are\\s+able\\s+to)\\s+graduate(?![a-z])");
+    private static final List<String> STANDING_TH = List.of("คุณมีสิทธิ์สำเร็จการศึกษา", "คุณมีสิทธิ์จบการศึกษา", "คุณจะจบการศึกษา",
+            "คุณจบการศึกษาได้", "คุณผ่านเกณฑ์ครบ", "ครบทุกเงื่อนไขแล้ว");
     private static final Pattern SEATS_OF = Pattern.compile("(?i)(?<![\\w.:/-])(\\d{1,4})\\s*(?:/|\\s(?:of|out of)\\s)\\s*(\\d{1,4})\\s+(?:[a-z]+\\s+)?seats?(?![a-z])");
     private static final Pattern SEATS_BEFORE = Pattern.compile("(?i)(?<![\\w.:/-])(\\d{1,4})\\s+(?:[a-z]+\\s+){0,2}seats?(?![a-z])");
     private static final Pattern SEATS_AFTER = Pattern.compile(
@@ -72,12 +115,14 @@ public class GroundedAnswerValidatorImpl implements GroundedAnswerValidator {
             return new GroundingValidationResult(Outcome.MISSING_REQUIRED_EVIDENCE, List.of());
         if (generatedAnswer == null || generatedAnswer.isBlank()) return GroundingValidationResult.grounded();
         Facts facts = Facts.of(evidence);
+        facts.derive(generatedAnswer);
         var unsupported = new LinkedHashSet<String>();
         var inconsistent = new LinkedHashSet<String>();
 
         for (String code : courseCodes(generatedAnswer)) if (!facts.courseCodes.contains(code)) unsupported.add("COURSE_CODE");
         for (long section : numbers(SECTION, generatedAnswer)) if (!facts.sections.contains(section)) unsupported.add("SECTION");
-        check(credits(generatedAnswer), facts.credits, "CREDIT_HOURS", unsupported, inconsistent);
+        check(credits(generatedAnswer, facts.wide()), facts.credits, "CREDIT_HOURS", unsupported, inconsistent);
+        if (facts.wide()) check(gpas(generatedAnswer), facts.gpas, "GPA", unsupported, inconsistent);
         check(seats(generatedAnswer), facts.seats, "SEATS", unsupported, inconsistent);
         check(rooms(generatedAnswer), facts.rooms, "ROOM", unsupported, inconsistent);
         for (String program : programs(generatedAnswer)) {
@@ -92,6 +137,7 @@ public class GroundedAnswerValidatorImpl implements GroundedAnswerValidator {
         for (long year : numbers(YEAR, generatedAnswer)) if (!facts.years.contains(year)) unsupported.add("YEAR");
         for (int time : times(generatedAnswer)) if (!facts.times.contains(time)) unsupported.add("TIME");
         for (String day : weekdays(generatedAnswer)) if (!facts.weekdays.contains(day)) unsupported.add("WEEKDAY");
+        if (facts.progressEvidence && claimsStanding(generatedAnswer)) unsupported.add("STANDING");
 
         if (unsupported.isEmpty() && inconsistent.isEmpty()) return GroundingValidationResult.grounded();
         var issues = new ArrayList<>(inconsistent);
@@ -123,11 +169,25 @@ public class GroundedAnswerValidatorImpl implements GroundedAnswerValidator {
         return out;
     }
 
-    private static Set<Long> credits(String text) {
+    private static Set<Long> credits(String text, boolean wide) {
         var out = new LinkedHashSet<Long>();
-        for (Pattern p : List.of(CREDITS, CREDITS_AFTER)) {
+        for (Pattern p : wide ? List.of(CREDITS_WIDE, CREDITS_AFTER_WIDE, CREDITS_MORE) : List.of(CREDITS, CREDITS_AFTER)) {
             Matcher m = p.matcher(text);
             while (m.find()) out.add(number(m.group(1)));
+        }
+        return out;
+    }
+
+    /** Step 16A: whether the text claims the Student's standing (eligible, all requirements met, will graduate). */
+    static boolean claimsStanding(String text) {
+        return STANDING_EN.matcher(text).find() || STANDING_GRAD.matcher(text).find() || STANDING_TH.stream().anyMatch(text::contains);
+    }
+
+    static Set<BigDecimal> gpas(String text) {
+        var out = new LinkedHashSet<BigDecimal>();
+        for (Pattern p : List.of(GPA_AFTER, GPA_BEFORE)) {
+            Matcher m = p.matcher(text);
+            while (m.find()) out.add(new BigDecimal(m.group(1)).stripTrailingZeros());
         }
         return out;
     }
@@ -218,7 +278,19 @@ public class GroundedAnswerValidatorImpl implements GroundedAnswerValidator {
         final Set<Long> years = new HashSet<>();
         final Set<Integer> times = new HashSet<>();
         final Set<String> weekdays = new HashSet<>();
+        final Set<BigDecimal> gpas = new HashSet<>();
+        /** Step 16B: whole numbers written as digits in VERIFIED passages, and the last VERIFIED progress values. */
+        final Set<Long> passageDigits = new HashSet<>();
+        Long earned;
+        Long current;
         boolean anyVerified;
+        /** Step 15A: at least one VERIFIED document search. */
+        boolean documentEvidence;
+        /** Step 16A: at least one VERIFIED result of get_my_academic_progress. */
+        boolean progressEvidence;
+
+        /** Whether the wide credit patterns and the GPA claims apply (spec file 56, section 10.2). */
+        boolean wide() { return documentEvidence || progressEvidence; }
 
         static Facts of(List<AcademicEvidence> evidence) {
             var facts = new Facts();
@@ -231,8 +303,82 @@ public class GroundedAnswerValidatorImpl implements GroundedAnswerValidator {
                 if (!trusted) continue;
                 facts.anyVerified |= e.status() == AcademicEvidenceStatus.VERIFIED;
                 facts.collect(null, e.verifiedData());
+                if (AcademicAiToolNames.SEARCH_UNIVERSITY_KNOWLEDGE.equals(e.toolName()) && e.status() == AcademicEvidenceStatus.VERIFIED
+                        && e.verifiedData() instanceof Collection<?> passages) {
+                    facts.documentEvidence = true;
+                    for (Object passage : passages) if (passage instanceof Map<?, ?> p) facts.passage(p);
+                }
+                if (AcademicAiToolNames.GET_MY_ACADEMIC_PROGRESS.equals(e.toolName()) && e.status() == AcademicEvidenceStatus.VERIFIED
+                        && e.verifiedData() instanceof Map<?, ?> progress) {
+                    facts.progressEvidence = true;
+                    facts.progress(progress);
+                }
             }
             return facts;
+        }
+
+        // Spec file 57, section 9.2: credits derived from VERIFIED progress and VERIFIED passages of the same request.
+        void derive(String answer) {
+            if (!progressEvidence || !documentEvidence || answer == null || earned == null) return;
+            if (current != null) credits.add(earned + current);
+            Matcher m = WHOLE_NUMBER.matcher(answer);
+            while (m.find()) {
+                long p = Long.parseLong(m.group(1));
+                if (!passageDigits.contains(p)) continue;
+                credits.add(Math.abs(p - earned));
+                if (current != null) credits.add(Math.abs(p - (earned + current)));
+            }
+        }
+
+        // Spec file 56, section 10.1: earned credits (whole numbers only), current credits and the grade point average.
+        private void progress(Map<?, ?> p) {
+            BigDecimal earned = decimal(p.get("creditsEarned"));
+            this.earned = earned != null && earned.stripTrailingZeros().scale() <= 0 ? earned.longValueExact() : null;
+            if (this.earned != null) credits.add(this.earned);
+            BigDecimal current = decimal(p.get("currentEnrolledCredits"));
+            this.current = current != null && current.stripTrailingZeros().scale() <= 0 ? current.longValueExact() : null;
+            if (this.current != null) credits.add(this.current);
+            BigDecimal cgpa = decimal(p.get("cgpa"));
+            if (cgpa != null) gpas.add(cgpa.stripTrailingZeros());
+        }
+
+        private static BigDecimal decimal(Object value) {
+            if (value instanceof BigDecimal d) return d;
+            if (value instanceof Number n) return new BigDecimal(n.toString());
+            return null;
+        }
+
+        // Spec file 53, section 12.2: the values written in a retrieved passage.
+        private void passage(Map<?, ?> p) {
+            var body = new StringJoiner("\n");
+            for (String key : List.of("documentTitle", "section", "text")) if (p.get(key) != null) body.add(String.valueOf(p.get(key)));
+            String text = body.toString();
+            var whole = new HashSet<Long>();
+            Matcher m = WHOLE_NUMBER.matcher(text);
+            while (m.find()) whole.add(Long.parseLong(m.group(1)));
+            passageDigits.addAll(whole);
+            Matcher w = NUMBER_WORDS.matcher(text);
+            while (w.find()) {
+                String word = w.group(1).toLowerCase(Locale.ROOT);
+                whole.add((long) (WORDS.containsKey(word) ? WORDS.get(word) : ORDINALS.get(word)));
+            }
+            credits.addAll(whole);
+            seats.addAll(whole);
+            sections.addAll(whole);
+            semesters.addAll(whole);
+            rooms.addAll(rooms(text + "\n" + (p.get("pages") == null ? "" : p.get("pages"))));
+            List<String> names = nameTokens(text);
+            if (!names.isEmpty()) lecturers.add(names);
+            programs.add(text.toLowerCase(Locale.ROOT));
+            if (p.get("academicYear") != null) {
+                Matcher y = ACADEMIC_YEAR.matcher(String.valueOf(p.get("academicYear")));
+                if (y.matches()) {
+                    years.add(Long.parseLong(y.group(1)));
+                    years.add(Long.parseLong(y.group(2)));
+                }
+            }
+            Matcher g = GPA_VALUE.matcher(text);
+            while (g.find()) gpas.add(new BigDecimal(g.group(1)).stripTrailingZeros());
         }
 
         private void collect(String key, Object value) {

@@ -1,0 +1,43 @@
+SAMPLE DATA FOR DEVELOPMENT ONLY — NOT AN OFFICIAL UNIVERSITY DOCUMENT
+
+Sample University Undergraduate Academic Regulations (fictional), Academic Year 2026
+
+Chapter 1 General Provisions
+
+Article 1. These sample regulations apply to all undergraduate students of Sample University.
+
+Article 2. An academic year has two regular semesters and one summer session. A regular semester lasts 15 weeks. The summer session lasts 8 weeks.
+
+Chapter 2 Registration
+
+Article 3. In a regular semester a student must register for at least 9 credits and at most 22 credits. In the summer session a student may register for at most 9 credits.
+
+Article 4. A student may add or drop a course within the first 14 days of a regular semester. A course dropped in this period does not appear on the transcript.
+
+Article 5. A student may withdraw from a course until the end of week 10. A withdrawn course is recorded with the grade W and is not counted in the grade point average.
+
+Article 6. A student who registers after the registration period pays a late registration fee of 500 baht.
+
+Chapter 3 Tuition and Fees
+
+Article 7. Tuition must be paid within 14 days after the first day of the semester. A late payment fine of 50 baht per day is charged, up to a maximum of 1,500 baht.
+
+Article 8. A student who has not paid tuition by the end of week 4 is not allowed to sit the midterm examination.
+
+Chapter 4 Examinations
+
+Article 9. A student must attend at least 80 percent of the classes of a course to be allowed to sit its final examination.
+
+Article 10. Final grades are announced within 14 days after the last examination day. A student may request a grade review within 7 days after the grades are announced.
+
+Chapter 5 Graduation
+
+Article 11. To graduate, a student must complete at least 120 credits required by the curriculum and have a cumulative grade point average of at least 2.00.
+
+Article 12. A student must apply for graduation within the first 30 days of the final semester.
+
+หมวด 6 การลาพักการศึกษา
+
+ข้อ 13 นักศึกษาสามารถลาพักการศึกษาได้ครั้งละไม่เกิน 2 ภาคการศึกษาปกติติดต่อกัน
+
+ข้อ 14 นักศึกษาต้องชำระค่าธรรมเนียมรักษาสถานภาพนักศึกษา ภาคการศึกษาละ 1,000 บาท ในระหว่างที่ลาพักการศึกษา

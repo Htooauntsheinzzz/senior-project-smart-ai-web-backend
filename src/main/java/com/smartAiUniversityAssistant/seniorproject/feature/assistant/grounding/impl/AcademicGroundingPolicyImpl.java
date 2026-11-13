@@ -5,7 +5,9 @@ import static com.smartAiUniversityAssistant.seniorproject.feature.assistant.ser
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.grounding.AcademicGroundingPolicy;
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.intent.AcademicIntent;
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.intent.AcademicIntentCatalog;
+import com.smartAiUniversityAssistant.seniorproject.feature.assistant.service.impl.HybridAcademicQuestionDetector;
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.service.impl.PersonalAcademicQuestionDetector;
+import com.smartAiUniversityAssistant.seniorproject.feature.assistant.service.impl.UniversityKnowledgeQuestionDetector;
 import java.util.*;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
@@ -15,11 +17,14 @@ import org.springframework.stereotype.Component;
  * them need evidence. The message rule reuses Step 7/8's PersonalAcademicQuestionDetector. Date-relative schedule
  * questions are recognised by a small English/Thai/Myanmar phrase list: "next class" style phrases on their own,
  * relative days ("today", "tomorrow") only in a personal academic question about classes.
+ * Step 15A: search_university_knowledge is grounded too; document questions are recognised by
+ * UniversityKnowledgeQuestionDetector.
  */
 @Component
 public class AcademicGroundingPolicyImpl implements AcademicGroundingPolicy {
     private static final Set<String> ACADEMIC_TOOLS = Set.of(GET_MY_ACADEMIC_PROFILE, GET_MY_ENROLLMENTS, GET_MY_COURSES,
-            GET_MY_SCHEDULE, GET_MY_COURSE_SECTION, GET_MY_COURSE_LECTURER, GET_COURSE_INFORMATION, GET_SECTION_AVAILABILITY);
+            GET_MY_SCHEDULE, GET_MY_COURSE_SECTION, GET_MY_COURSE_LECTURER, GET_COURSE_INFORMATION, GET_SECTION_AVAILABILITY,
+            SEARCH_UNIVERSITY_KNOWLEDGE, GET_MY_ACADEMIC_PROGRESS);
     private static final Pattern NEXT_CLASS = Pattern.compile(
             "(?<![a-z])(next|upcoming|following)\\s+(class|classes|lecture|lectures|lesson|lessons|session|period)(?![a-z])"
             + "|(?<![a-z])(which|what)\\s+(class|lecture|course)\\w*\\s+(starts?|begins?|is)\\s+(first|next)(?![a-z])");
@@ -44,6 +49,22 @@ public class AcademicGroundingPolicyImpl implements AcademicGroundingPolicy {
     @Override
     public boolean messageRequiresAcademicEvidence(String message) {
         return PersonalAcademicQuestionDetector.requiresAcademicEvidence(message);
+    }
+
+    @Override
+    public boolean messageRequiresKnowledgeEvidence(String message) {
+        return UniversityKnowledgeQuestionDetector.asksAboutUniversityRules(message)
+                || UniversityKnowledgeQuestionDetector.asksAboutCurriculumTopic(message);
+    }
+
+    @Override
+    public boolean messageRequiresKnowledgeSearch(String message) {
+        return UniversityKnowledgeQuestionDetector.asksAboutUniversityRules(message);
+    }
+
+    @Override
+    public boolean messageAsksAboutOwnStanding(String message) {
+        return HybridAcademicQuestionDetector.asksAboutOwnStanding(message);
     }
 
     @Override

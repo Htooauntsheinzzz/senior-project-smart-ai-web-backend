@@ -40,6 +40,8 @@ abstract class IntentEvaluationSupport extends IntegrationSupport {
     @Autowired MutableClock clock;
     AssistantAcademicFixture fixture;
     private final Map<String, String> tokens = new HashMap<>();
+    /** The JSON body of the latest response (Step 15 grades its sources array). */
+    private volatile JsonNode lastBody;
 
     @TestConfiguration(proxyBeanMethods = false)
     static class RecorderConfiguration {
@@ -79,6 +81,7 @@ abstract class IntentEvaluationSupport extends IntegrationSupport {
         long durationMs = (System.nanoTime() - started) / 1_000_000;
         boolean modified = !before.equals(fixture.enrollmentFingerprint());
         JsonNode body = json.readTree(response.getContentAsString(StandardCharsets.UTF_8));
+        lastBody = body;
         int status = response.getStatus();
         List<LlmRequest> sent = recorder.requests();
         // Round n is the n-th provider turn that asked for tools; a call the backend made itself is round 0.
@@ -113,6 +116,9 @@ abstract class IntentEvaluationSupport extends IntegrationSupport {
                 List.of(sent.getFirst().systemPrompt(), sent.getFirst().tools())));
         return HexFormat.of().formatHex(digest);
     }
+
+    /** The JSON body of the latest response sent by {@link #send}. */
+    JsonNode lastBody() { return lastBody; }
 
     /** Forget cached tokens, e.g. after the fixture was re-created. */
     void clearTokens() { tokens.clear(); }

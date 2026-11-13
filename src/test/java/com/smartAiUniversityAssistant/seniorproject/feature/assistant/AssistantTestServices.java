@@ -17,6 +17,20 @@ public final class AssistantTestServices {
     private AssistantTestServices() {
     }
 
+    /** Step 16A: the same with the knowledge and progress switches (the registry follows them). */
+    public static StudentAssistantServiceImpl service(CurrentStudentProvider currentStudent, StudentAcademicService academics,
+            LlmClient llm, AcademicAiToolExecutor toolExecutor, AiAssistantProperties properties,
+            ConversationContextService conversations, Clock clock,
+            com.smartAiUniversityAssistant.seniorproject.feature.assistant.service.AssistantKnowledgeSettings knowledge,
+            com.smartAiUniversityAssistant.seniorproject.feature.assistant.service.AssistantProgressSettings progress) {
+        var policy = new AcademicGroundingPolicyImpl();
+        var responses = new SafeAcademicResponseFactoryImpl();
+        return new StudentAssistantServiceImpl(currentStudent, academics, llm, new AcademicAiToolRegistryImpl(knowledge, progress),
+                toolExecutor, properties, conversations, new AcademicReferenceResolverImpl(), policy,
+                new AcademicGroundingServiceImpl(policy, responses, clock), new GroundedAnswerValidatorImpl(), responses, clock,
+                knowledge, progress);
+    }
+
     public static StudentAssistantServiceImpl service(CurrentStudentProvider currentStudent, StudentAcademicService academics,
             LlmClient llm, AcademicAiToolExecutor toolExecutor, AiAssistantProperties properties,
             ConversationContextService conversations, Clock clock) {

@@ -68,10 +68,12 @@ class CampusWriteSupport {
         if (phone != null && !PHONE.matcher(phone).matches()) throw CampusFailure.invalid("The phone number format is invalid.");
         return phone;
     }
-    /** Both values required, in range, and with no more precision than NUMERIC(10,7) stores. */
+    /** Matches the NUMERIC(18,15) coordinate columns (V55). */
+    static final int COORDINATE_SCALE = 15;
+    /** Both values required, in range, and with no more precision than NUMERIC(18,15) stores. */
     void coordinates(BigDecimal latitude, BigDecimal longitude) {
         if (latitude == null || longitude == null || !inRange(latitude, longitude)
-                || latitude.stripTrailingZeros().scale() > 7 || longitude.stripTrailingZeros().scale() > 7)
+                || latitude.stripTrailingZeros().scale() > COORDINATE_SCALE || longitude.stripTrailingZeros().scale() > COORDINATE_SCALE)
             throw CampusFailure.invalidCoordinates();
     }
     void coordinates(CampusCoordinate point) {

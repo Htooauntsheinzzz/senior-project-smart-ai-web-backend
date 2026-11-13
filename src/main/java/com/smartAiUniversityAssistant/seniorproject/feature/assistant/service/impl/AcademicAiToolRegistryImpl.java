@@ -4,16 +4,24 @@ import static com.smartAiUniversityAssistant.seniorproject.feature.assistant.ser
 
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.dto.AcademicAiToolDefinition;
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.service.AcademicAiToolRegistry;
+import com.smartAiUniversityAssistant.seniorproject.feature.assistant.service.AssistantKnowledgeSettings;
+import com.smartAiUniversityAssistant.seniorproject.feature.assistant.service.AssistantProgressSettings;
 import java.util.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
  * The eight Step 6 tools; Step 8 descriptions name the question categories each tool answers (AcademicIntentCatalog). Schemas are minimal and closed (additionalProperties=false); none has a student id,
  * because the Student always comes from the token. The executor enforces the same rules on whatever the model sends.
+ * Step 15A: search_university_knowledge is the ninth tool, declared and supported only while the knowledge search is
+ * active. Its only argument is the query; the Student scope always comes from the Student's own profile.
+ * Step 16A: get_my_academic_progress (no argument) follows the eight database tools while the progress tool is active,
+ * before the document search.
  */
 @Component
 public class AcademicAiToolRegistryImpl implements AcademicAiToolRegistry {
     static final int MAX_COURSE_IDENTIFIER_LENGTH = 100;
+    static final int MAX_KNOWLEDGE_QUERY_LENGTH = 300;
 
     private static final List<AcademicAiToolDefinition> TOOLS = List.of(
             noArguments(GET_MY_ACADEMIC_PROFILE, "Get the authenticated student's academic profile: student code, name, "
@@ -47,12 +55,62 @@ public class AcademicAiToolRegistryImpl implements AcademicAiToolRegistry {
                             "description", "The courseSectionId from another academic tool result, or the section id the student gave as a number.")), "courseSectionId")));
     private static final Set<String> NAMES = TOOLS.stream().map(AcademicAiToolDefinition::name)
             .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    static final AcademicAiToolDefinition KNOWLEDGE_TOOL = new AcademicAiToolDefinition(SEARCH_UNIVERSITY_KNOWLEDGE,
+            "Search the university's official documents that this student is allowed to read (regulations, announcements, "
+            + "handbooks, the curriculum documents of the student's program, fee and calendar information) and return the most "
+            + "relevant passages with their document title, academic year, whom each passage applies to (appliesTo), section and "
+            + "pages. Use it for questions about university rules, requirements, fees, deadlines and procedures, and about the "
+            + "student's curriculum: graduation requirements, total credits, program structure, required and elective courses, "
+            + "internships and cooperative education. It does not return the student's own records or results: use the other tools "
+            + "for those. An empty list means no relevant passage was found.",
+            schema(Map.of("query", Map.of("type", "string", "maxLength", MAX_KNOWLEDGE_QUERY_LENGTH,
+                    "description", "What to look for, as one short question or phrase in the language of the student's "
+                            + "question, for example \"minimum credits to graduate\" or \"major elective courses\". Do not include "
+                            + "the student's name or other personal data.")), "query"));
+    static final AcademicAiToolDefinition PROGRESS_TOOL = noArguments(GET_MY_ACADEMIC_PROGRESS, "Get the authenticated student's "
+            + "academic progress totals: cumulative grade point average (cgpa), credits earned from finalized course results "
+            + "(creditsEarned), number of courses and credits in the current semester (currentCourses, currentEnrolledCredits), study "
+            + "year and academic year. Use it for \"What is my GPA?\", \"How many credits have I earned?\" and \"How many credits am I "
+            + "taking this semester?\", and together with search_university_knowledge when the student asks how they stand against a "
+            + "requirement. A null value means not currently available. It does not list courses or grades and does not say whether "
+            + "a requirement is met.");
+
+    private final AssistantKnowledgeSettings knowledge;
+    private final AssistantProgressSettings progress;
+
+    /** The eight database tools only: knowledge search and progress not active (existing tests build the registry this way). */
+    public AcademicAiToolRegistryImpl() {
+        this(AssistantKnowledgeSettings.inactive());
+    }
+
+    /** Spec file 53 tests: progress not active. */
+    public AcademicAiToolRegistryImpl(AssistantKnowledgeSettings knowledge) {
+        this(knowledge, AssistantProgressSettings.inactive());
+    }
+
+    @Autowired
+    public AcademicAiToolRegistryImpl(AssistantKnowledgeSettings knowledge, AssistantProgressSettings progress) {
+        this.knowledge = knowledge;
+        this.progress = progress;
+    }
 
     @Override
-    public List<AcademicAiToolDefinition> getAvailableTools() { return TOOLS; }
+    public List<AcademicAiToolDefinition> getAvailableTools() {
+        boolean withProgress = progress.active();
+        boolean withKnowledge = knowledge.active();
+        if (!withProgress && !withKnowledge) return TOOLS;
+        var all = new ArrayList<>(TOOLS);
+        if (withProgress) all.add(PROGRESS_TOOL);
+        if (withKnowledge) all.add(KNOWLEDGE_TOOL);
+        return List.copyOf(all);
+    }
 
     @Override
-    public boolean isSupported(String toolName) { return toolName != null && NAMES.contains(toolName); }
+    public boolean isSupported(String toolName) {
+        if (toolName == null) return false;
+        return NAMES.contains(toolName) || SEARCH_UNIVERSITY_KNOWLEDGE.equals(toolName) && knowledge.active()
+                || GET_MY_ACADEMIC_PROGRESS.equals(toolName) && progress.active();
+    }
 
     private static AcademicAiToolDefinition noArguments(String name, String description) {
         return new AcademicAiToolDefinition(name, description, schema(Map.of()));

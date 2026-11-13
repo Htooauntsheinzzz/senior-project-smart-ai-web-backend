@@ -5,13 +5,16 @@ import static com.smartAiUniversityAssistant.seniorproject.feature.assistant.ser
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.grounding.AcademicEvidence;
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.grounding.AcademicEvidenceStatus;
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.grounding.SafeAcademicResponseFactory;
+import java.text.BreakIterator;
 import java.util.*;
 import org.springframework.stereotype.Component;
 
 /**
  * English, deterministic replies (like the Step 7 fallback). groundedAnswer renders the fields of each verified tool
  * result with templates; a null field is written as "not currently available", never filled in. Free text entered by
- * administrators (course descriptions) is not rendered. Identical evidence is rendered once.
+ * administrators (course descriptions) is still not rendered for database results, but document passages of
+ * search_university_knowledge are quoted (at most two), because the passage is the answer (Step 15A). Identical
+ * evidence is rendered once.
  */
 @Component
 public class SafeAcademicResponseFactoryImpl implements SafeAcademicResponseFactory {
@@ -20,6 +23,16 @@ public class SafeAcademicResponseFactoryImpl implements SafeAcademicResponseFact
             + "so I cannot answer it reliably. Please try again or ask more specifically, for example "
             + "\"What courses am I enrolled in?\" or \"Who teaches my CS301 class?\".";
     static final String NOT_AVAILABLE = "not currently available";
+    public static final String KNOWLEDGE_NOT_FOUND = "I could not find information about this in the university documents I can "
+            + "search. Please check with the responsible university office, or try asking in a different way.";
+    public static final String KNOWLEDGE_UNAVAILABLE = "I can't search the university documents right now, so I won't guess. "
+            + "Please try again in a few minutes.";
+    public static final String KNOWLEDGE_MISSING_EVIDENCE = "I could not look this up in the university documents, so I cannot "
+            + "answer it reliably. Please try asking again.";
+    public static final String DEGREE_AUDIT_REFERRAL = "I could not reliably compare your records with these requirements. Please "
+            + "compare the values above yourself, or ask the registrar's office for an official degree audit.";
+    static final int MAX_QUOTED_PASSAGES = 2;
+    static final int MAX_QUOTED_CHARS = 700;
 
     @Override
     public String lecturerUnavailable(String courseCode) {
@@ -96,18 +109,117 @@ public class SafeAcademicResponseFactoryImpl implements SafeAcademicResponseFact
     }
 
     @Override
+    public String degreeAuditReferral() {
+        return DEGREE_AUDIT_REFERRAL;
+    }
+
+    @Override
+    public String knowledgeNotFound() {
+        return KNOWLEDGE_NOT_FOUND;
+    }
+
+    @Override
+    public String knowledgeUnavailable() {
+        return KNOWLEDGE_UNAVAILABLE;
+    }
+
+    @Override
+    public String knowledgeMissingEvidence() {
+        return KNOWLEDGE_MISSING_EVIDENCE;
+    }
+
+    @Override
     public String groundedAnswer(List<AcademicEvidence> evidence) {
+        List<AcademicEvidence> all = evidence == null ? List.of() : evidence;
         var parts = new LinkedHashSet<String>();
-        for (AcademicEvidence e : evidence == null ? List.<AcademicEvidence>of() : evidence) {
+        for (AcademicEvidence e : all) {
+            if (isKnowledge(e)) continue;
             if (e.status() == AcademicEvidenceStatus.VERIFIED_EMPTY) parts.add(enrollmentUnavailable());
             if (e.status() != AcademicEvidenceStatus.VERIFIED) continue;
             String part = render(e.toolName(), e.verifiedData());
             if (part != null) parts.add(part);
         }
+        List<Map<?, ?>> passages = passages(all);
+        if (!passages.isEmpty()) parts.add(passageBlock(passages));
+        else if (all.stream().anyMatch(e -> isKnowledge(e) && e.status() == AcademicEvidenceStatus.UNAVAILABLE)) parts.add(knowledgeUnavailable());
+        else if (all.stream().anyMatch(e -> isKnowledge(e) && e.status() == AcademicEvidenceStatus.VERIFIED_EMPTY)) parts.add(knowledgeNotFound());
         if (!parts.isEmpty()) return String.join("\n\n", parts);
+        // Only searches with invalid arguments: the documents were not searched.
+        if (!all.isEmpty() && all.stream().allMatch(SafeAcademicResponseFactoryImpl::isKnowledge)) return knowledgeMissingEvidence();
         // Nothing verified: a database failure is said to be temporary; otherwise (only model mistakes) nothing was retrieved.
-        boolean failed = evidence != null && evidence.stream().anyMatch(e -> e.status() == AcademicEvidenceStatus.UNAVAILABLE);
+        boolean failed = all.stream().anyMatch(e -> e.status() == AcademicEvidenceStatus.UNAVAILABLE);
         return failed ? academicServiceUnavailable() : missingEvidence();
+    }
+
+    private static boolean isKnowledge(AcademicEvidence e) {
+        return SEARCH_UNIVERSITY_KNOWLEDGE.equals(e.toolName());
+    }
+
+    // The passage maps of every VERIFIED search in order, without repeats (same documentTitle, section and text).
+    static List<Map<?, ?>> passages(List<AcademicEvidence> evidence) {
+        var seen = new HashSet<List<Object>>();
+        var out = new ArrayList<Map<?, ?>>();
+        for (AcademicEvidence e : evidence) {
+            if (!isKnowledge(e) || e.status() != AcademicEvidenceStatus.VERIFIED || !(e.verifiedData() instanceof List<?> rows)) continue;
+            for (Object row : rows) {
+                if (!(row instanceof Map<?, ?> p)) continue;
+                if (seen.add(Arrays.asList(p.get("documentTitle"), p.get("section"), p.get("text")))) out.add(p);
+            }
+        }
+        return out;
+    }
+
+    // Spec file 55, section 9: the first passage for "your program" (else the first passage), then the rest of its
+    // section when it follows directly, otherwise the first other passage.
+    static List<Map<?, ?>> quoted(List<Map<?, ?>> passages) {
+        if (passages.size() <= 1) return passages;
+        int first = 0;
+        for (int i = 0; i < passages.size(); i++)
+            if ("your program".equals(passages.get(i).get("appliesTo"))) {
+                first = i;
+                break;
+            }
+        Map<?, ?> head = passages.get(first);
+        int second = -1;
+        if (first + 1 < passages.size()) {
+            Map<?, ?> next = passages.get(first + 1);
+            if (Objects.equals(next.get("documentTitle"), head.get("documentTitle")) && Objects.equals(next.get("section"), head.get("section")))
+                second = first + 1;
+        }
+        if (second < 0) second = first == 0 ? 1 : 0;
+        return List.of(head, passages.get(second));
+    }
+
+    private static String passageBlock(List<Map<?, ?>> passages) {
+        var out = new StringBuilder("Here is what the university documents say:");
+        List<Map<?, ?>> chosen = quoted(passages);
+        for (int i = 0; i < Math.min(MAX_QUOTED_PASSAGES, chosen.size()); i++) {
+            Map<?, ?> p = chosen.get(i);
+            out.append("\n\n").append(i + 1).append(". ").append(orUnavailable(p.get("documentTitle")));
+            String year = text(p.get("academicYear"));
+            if (year != null) out.append(" (").append(year).append(')');
+            String appliesTo = text(p.get("appliesTo"));
+            if (appliesTo != null) out.append(", for ").append(appliesTo);
+            String section = text(p.get("section"));
+            if (section != null) out.append(", ").append(section);
+            String pages = text(p.get("pages"));
+            if (pages != null) out.append(pages.contains("-") ? ", pages " : ", page ").append(pages);
+            String body = text(p.get("text"));
+            if (body != null) out.append('\n').append(cut(body));
+        }
+        return out.toString();
+    }
+
+    // At most 700 characters: cut at the last line break or space, otherwise at the last grapheme boundary.
+    static String cut(String text) {
+        if (text.length() <= MAX_QUOTED_CHARS) return text;
+        String head = text.substring(0, MAX_QUOTED_CHARS + 1);
+        int at = Math.max(head.lastIndexOf('\n'), head.lastIndexOf(' '));
+        if (at > 0) return text.substring(0, at).stripTrailing() + " …";
+        BreakIterator graphemes = BreakIterator.getCharacterInstance(Locale.ROOT);
+        graphemes.setText(text);
+        int end = graphemes.isBoundary(MAX_QUOTED_CHARS) ? MAX_QUOTED_CHARS : graphemes.preceding(MAX_QUOTED_CHARS);
+        return text.substring(0, Math.max(end, 0)) + " …";
     }
 
     private String render(String tool, Object data) {
@@ -127,6 +239,7 @@ public class SafeAcademicResponseFactoryImpl implements SafeAcademicResponseFact
             case GET_MY_COURSE_LECTURER -> lecturer(m);
             case GET_COURSE_INFORMATION -> courseInformation(m);
             case GET_SECTION_AVAILABILITY -> availability(m);
+            case GET_MY_ACADEMIC_PROGRESS -> progress(m);
             default -> null;
         };
     }
@@ -139,6 +252,20 @@ public class SafeAcademicResponseFactoryImpl implements SafeAcademicResponseFact
                 + "\n- Faculty: " + orUnavailable(m.get("facultyNameEn"))
                 + "\n- Semester: " + orUnavailable(semester)
                 + "\n- Academic year: " + orUnavailable(m.get("academicYear"));
+    }
+
+    // Step 16A (spec file 56, section 11): the totals as the tool returned them; nothing rounded or calculated.
+    private static String progress(Map<?, ?> m) {
+        return "Your academic progress:\n- Cumulative GPA: " + number(m.get("cgpa"))
+                + "\n- Credits earned from recorded course results: " + number(m.get("creditsEarned"))
+                + "\n- Courses this semester: " + number(m.get("currentCourses"))
+                + "\n- Credits this semester: " + number(m.get("currentEnrolledCredits"))
+                + "\n- Study year: " + number(m.get("studyYear"));
+    }
+
+    private static String number(Object value) {
+        if (value instanceof java.math.BigDecimal d) return d.toPlainString();
+        return orUnavailable(value);
     }
 
     private String enrollmentLine(Map<?, ?> m) {

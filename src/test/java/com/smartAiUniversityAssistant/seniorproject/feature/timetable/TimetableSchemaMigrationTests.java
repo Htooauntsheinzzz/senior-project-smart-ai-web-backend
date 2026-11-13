@@ -1,5 +1,6 @@
 package com.smartAiUniversityAssistant.seniorproject.feature.timetable;
 
+import com.smartAiUniversityAssistant.seniorproject.MigrationVersions;
 import static org.assertj.core.api.Assertions.*;
 
 import com.smartAiUniversityAssistant.seniorproject.IntegrationSupport;
@@ -53,8 +54,8 @@ class TimetableSchemaMigrationTests extends IntegrationSupport {
     void historyAppliesAndNothingIsSeeded() {
         flyway.migrate();
         assertThat(db.queryForList("SELECT version FROM flyway_schema_history WHERE success AND version::int >= 40 ORDER BY installed_rank", String.class))
-                .containsExactly("40", "41", "42", "43", "44", "45", "46", "47");
-        assertThat(db.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success AND version IS NOT NULL", Long.class)).isEqualTo(47);
+                .containsExactlyElementsOf(MigrationVersions.from(40));
+        assertThat(db.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success AND version IS NOT NULL", Long.class)).isEqualTo((long) MigrationVersions.count());
         for (String table : new String[] {"academic_terms", "timetable_meeting_exceptions", "course_section_meetings"})
             assertThat(db.queryForObject("SELECT count(*) FROM " + table, Long.class)).as(table).isZero();
         assertThat(db.queryForObject("SELECT description FROM flyway_schema_history WHERE version='30'", String.class)).isEqualTo("create course section meetings");

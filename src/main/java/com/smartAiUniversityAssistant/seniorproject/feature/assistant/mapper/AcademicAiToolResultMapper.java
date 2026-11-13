@@ -1,6 +1,8 @@
 package com.smartAiUniversityAssistant.seniorproject.feature.assistant.mapper;
 
 import com.smartAiUniversityAssistant.seniorproject.feature.academicquery.dto.*;
+import com.smartAiUniversityAssistant.seniorproject.feature.knowledge.service.KnowledgeAudience;
+import com.smartAiUniversityAssistant.seniorproject.feature.knowledge.service.KnowledgeSearchHit;
 import java.util.*;
 import org.springframework.stereotype.Component;
 
@@ -99,6 +101,39 @@ public class AcademicAiToolResultMapper {
 
     public List<Map<String, Object>> candidates(List<AcademicCourseCandidate> candidates) {
         return candidates.stream().map(c -> fields("courseCode", c.courseCode(), "courseName", c.courseName())).toList();
+    }
+
+    /**
+     * Step 15A: one passage of search_university_knowledge, exactly as the model receives it. A key without a value is
+     * left out; no id, score, rank, file name, scope or neighbour flag is included. pages only for PDF hits ("12" or
+     * "12-13"). Step 15B: appliesTo says whom the passage applies to, in words the model reads.
+     */
+    public Map<String, Object> knowledgePassage(KnowledgeSearchHit hit) {
+        var map = new LinkedHashMap<String, Object>();
+        map.put("documentTitle", hit.title());
+        if (hit.categoryName() != null) map.put("category", hit.categoryName());
+        map.put("academicYear", hit.academicYearLabel());
+        if (hit.audience() != null) map.put("appliesTo", appliesTo(hit.audience()));
+        if (hit.sectionTitle() != null) map.put("section", hit.sectionTitle());
+        if ("PAGE".equals(hit.unitType()))
+            map.put("pages", hit.pageStart() == hit.pageEnd() ? String.valueOf(hit.pageStart()) : hit.pageStart() + "-" + hit.pageEnd());
+        map.put("text", hit.content());
+        return map;
+    }
+
+    /** Step 16A: the progress totals, null values kept; no id, name, code, course or grade. */
+    public Map<String, Object> progress(AcademicProgressQueryResult r) {
+        return fields("cgpa", r.cgpa(), "creditsEarned", r.creditsEarned(), "currentCourses", r.currentCourses(),
+                "currentEnrolledCredits", r.currentEnrolledCredits(), "studyYear", r.studyYear(), "academicYear", r.academicYear(),
+                "dataStatus", r.dataStatus());
+    }
+
+    static String appliesTo(KnowledgeAudience audience) {
+        return switch (audience) {
+            case PROGRAM -> "your program";
+            case DEPARTMENT -> "your department";
+            case UNIVERSITY -> "all students";
+        };
     }
 
     // LinkedHashMap keeps null values and a stable field order.

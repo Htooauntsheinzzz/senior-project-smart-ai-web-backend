@@ -114,6 +114,9 @@ public final class AssistantAcademicFixture {
     public void clean() {
         db.update("DELETE FROM enrollments");
         db.update("DELETE FROM student_credentials");
+        // Step 17: stored assistant conversations reference the Student (no cascade, as everywhere in the schema).
+        db.update("DELETE FROM assistant_messages");
+        db.update("DELETE FROM assistant_conversations");
         db.update("DELETE FROM students");
         db.update("UPDATE app_users SET department_id=NULL,created_by=NULL,updated_by=NULL");
         PublishedMeetingTestData.clean(db);

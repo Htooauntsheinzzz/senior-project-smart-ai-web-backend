@@ -266,6 +266,10 @@ class AssistantConversationIntegrationTests extends IntegrationSupport {
         listCourses();
         String id = ok(chat(tokenA, null, "What courses do I have?")).get("conversationId").stringValue();
         redis.delete(KEY_PREFIX + id);  // what Redis does when the TTL runs out
+        // Step 17 would restore it from the stored history (AssistantConversationHistoryIntegrationTests); without a
+        // stored conversation an expired context is still simply gone.
+        db.update("DELETE FROM assistant_messages WHERE conversation_id=?::uuid", id);
+        db.update("DELETE FROM assistant_conversations WHERE id=?::uuid", id);
         var expired = error(chat(tokenA, id, "Who teaches the first one?"), 404, "CONVERSATION_NOT_FOUND");
         assertThat(expired).doesNotContain("CS301");
         assertThat(redis.hasKey(KEY_PREFIX + id)).isFalse();

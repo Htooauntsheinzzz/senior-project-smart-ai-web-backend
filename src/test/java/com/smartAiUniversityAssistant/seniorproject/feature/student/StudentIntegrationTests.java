@@ -82,6 +82,9 @@ class StudentIntegrationTests extends IntegrationSupport {
         db.update("DELETE FROM enrollments");
         db.update("DELETE FROM students");
         db.update("UPDATE app_users SET department_id=NULL,created_by=NULL,updated_by=NULL");
+        // Timetable meetings reference sections and campus rooms; other classes may leave some behind.
+        db.update("DELETE FROM timetable_meeting_exceptions");
+        db.update("DELETE FROM course_section_meetings");
         db.update("DELETE FROM course_sections");
         db.update("DELETE FROM courses");
         db.update("DELETE FROM lectures");

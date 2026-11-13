@@ -1,5 +1,6 @@
 package com.smartAiUniversityAssistant.seniorproject.feature.campus;
 
+import com.smartAiUniversityAssistant.seniorproject.MigrationVersions;
 import static org.assertj.core.api.Assertions.*;
 
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
@@ -42,7 +43,7 @@ class CampusSchemaMigrationTests extends IntegrationSupport {
     @Test
     void historySucceedsAndNothingIsSeeded() {
         assertThat(db.queryForList("SELECT version FROM flyway_schema_history WHERE success AND version::int >= 33 ORDER BY installed_rank", String.class))
-                .containsExactly("33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46", "47");
+                .containsExactlyElementsOf(MigrationVersions.from(33));
         for (String table : TABLES) assertThat(tableExists(table)).as(table).isTrue();
         db.update("DELETE FROM campus_buildings");
         db.update("DELETE FROM campus_categories");

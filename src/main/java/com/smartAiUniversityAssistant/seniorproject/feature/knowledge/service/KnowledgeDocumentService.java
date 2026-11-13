@@ -19,6 +19,7 @@ public interface KnowledgeDocumentService {
     /** fileId null means the current revision. */
     KnowledgeDocumentDownload download(AuthenticatedUser actor, long id, Long fileId);
     KnowledgeDocumentProcessingResponse processing(AuthenticatedUser actor, long id);
-    /** Reserved for the ingestion step: refuses with DOCUMENT_PROCESSING_NOT_AVAILABLE until a worker exists. */
-    void reprocess(AuthenticatedUser actor, long id);
+    /** Queues the current file for processing (spec file 46, section 14); 503 while no stage is installed. */
+    KnowledgeDocumentProcessingResponse reprocess(AuthenticatedUser actor, long id,
+            com.smartAiUniversityAssistant.seniorproject.feature.knowledge.enums.ReprocessMode mode);
 }

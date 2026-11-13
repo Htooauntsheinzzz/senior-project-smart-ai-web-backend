@@ -1,7 +1,10 @@
 -- Step 6 (spec 31) assistant test data for the LOCAL development database only.
 -- Not a Flyway migration: never copy this into src/main/resources/db/migration.
--- Already applied to the local dev database on 2026-10-20. To apply again on a fresh database:
---   docker exec -i smart-university-postgres-1 psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" < docker/dev-fixtures/step6-assistant-test-data.sql
+-- Needs the schema at V51 (or later) and the seeded super admin (app user id 1). Apply on a fresh database:
+--   docker exec -i smart-university-postgres-1 sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < docker/dev-fixtures/step6-assistant-test-data.sql
+-- Updated 2026-11-10 (D81): course sections no longer have room/schedule columns (V45). The rooms and class times below
+-- are published timetable meetings (course_section_meetings, status PUBLISHED) in campus rooms of site S6-SITE,
+-- building S6-B1 "Test Building", effective 2026-01-05 to 2027-12-31.
 --
 -- Test accounts (password for both: StepSix-Test-2026!)
 --   std-test-001@rsu.ac.th  STD-TEST-001  ACTIVE in CS301 SEC-01 (Dr. John Smith, 11-402, Tuesday 09:00-11:45)
@@ -15,6 +18,10 @@
 --   DELETE FROM enrollments WHERE student_id IN (SELECT id FROM students WHERE student_code IN ('STD-TEST-001','STD-TEST-002'));
 --   DELETE FROM student_credentials WHERE student_id IN (SELECT id FROM students WHERE student_code IN ('STD-TEST-001','STD-TEST-002'));
 --   DELETE FROM students WHERE student_code IN ('STD-TEST-001','STD-TEST-002');
+--   DELETE FROM course_section_meetings WHERE course_section_id IN (SELECT id FROM course_sections WHERE semester_id IN (SELECT id FROM semesters WHERE semester_name_th='ภาคการศึกษาที่ 1 (ทดสอบ)'));
+--   DELETE FROM campus_rooms WHERE building_id IN (SELECT id FROM campus_buildings WHERE building_code='S6-B1');
+--   DELETE FROM campus_buildings WHERE building_code='S6-B1';
+--   DELETE FROM campus_sites WHERE site_code='S6-SITE';
 --   DELETE FROM course_sections WHERE semester_id IN (SELECT id FROM semesters WHERE semester_name_th='ภาคการศึกษาที่ 1 (ทดสอบ)');
 --   DELETE FROM courses WHERE department_id IN (SELECT id FROM departments WHERE department_code='CS-TEST');
 --   DELETE FROM lectures WHERE department_id IN (SELECT id FROM departments WHERE department_code='CS-TEST');
@@ -36,15 +43,30 @@ INSERT INTO courses(course_code,course_name,credit_hours,description,faculty_id,
   (VALUES ('CS301','Data Structures','Linear and non-linear data structures and their algorithms.','CS201'),
           ('CSC452','Mobile Programming','Building mobile applications.',NULL),
           ('CSC453','Web Programming','Building web applications.',NULL)) v(c,n,dsc,pre) WHERE d.department_code='CS-TEST';
-INSERT INTO course_sections(course_id,section_number,capacity,lecture_id,room,schedule,semester_id,status,created_by)
-  SELECT c.id, v.sec, 40, l.id, v.room, v.sched, s.id, 'ACTIVE', 1
-  FROM (VALUES ('CS301','SEC-01','Dr. John Smith','11-402','Tuesday 09:00-11:45'),
-               ('CSC452','SEC-02','Dr. Jane Lee','5-201','Friday 09:00-11:45'),
-               ('CSC453','SEC-01','Dr. Jane Lee',NULL,NULL)) v(code,sec,lect,room,sched)
+INSERT INTO course_sections(course_id,section_number,capacity,lecture_id,semester_id,status,created_by)
+  SELECT c.id, v.sec, 40, l.id, s.id, 'ACTIVE', 1
+  FROM (VALUES ('CS301','SEC-01','Dr. John Smith'),
+               ('CSC452','SEC-02','Dr. Jane Lee'),
+               ('CSC453','SEC-01','Dr. Jane Lee')) v(code,sec,lect)
   JOIN courses c ON c.course_code=v.code AND NOT c.is_deleted
   JOIN lectures l ON l.lecture_name_en=v.lect
   JOIN departments d ON d.id=l.department_id AND d.department_code='CS-TEST'
   JOIN semesters s ON s.semester_name_th='ภาคการศึกษาที่ 1 (ทดสอบ)';
+-- The published timetable (spec file 40): one weekly LECTURE meeting per section with a room; CSC453 SEC-01 has none.
+INSERT INTO campus_sites(site_code,site_name) VALUES ('S6-SITE','Test Campus');
+INSERT INTO campus_buildings(site_id,building_code,building_name,total_floors)
+  SELECT id,'S6-B1','Test Building',12 FROM campus_sites WHERE site_code='S6-SITE';
+INSERT INTO campus_rooms(building_id,room_number,floor_number,room_type)
+  SELECT b.id, v.num, v.floor, 'CLASSROOM' FROM campus_buildings b, (VALUES ('11-402',11),('5-201',5)) v(num,floor) WHERE b.building_code='S6-B1';
+INSERT INTO course_section_meetings(course_section_id,meeting_type,day_of_week,start_time,end_time,effective_from,effective_to,
+    room_id,room_label,status,is_active,created_by)
+  SELECT cs.id, 'LECTURE', v.dow, TIME '09:00', TIME '11:45', DATE '2026-01-05', DATE '2027-12-31', r.id, v.room, 'PUBLISHED', TRUE, 1
+  FROM (VALUES ('CS301','SEC-01','11-402',2),('CSC452','SEC-02','5-201',5)) v(code,sec,room,dow)
+  JOIN courses c ON c.course_code=v.code AND NOT c.is_deleted
+  JOIN course_sections cs ON cs.course_id=c.id AND cs.section_number=v.sec
+  JOIN semesters s ON s.id=cs.semester_id AND s.semester_name_th='ภาคการศึกษาที่ 1 (ทดสอบ)'
+  JOIN campus_rooms r ON r.room_number=v.room
+  JOIN campus_buildings b ON b.id=r.building_id AND b.building_code='S6-B1';
 INSERT INTO students(student_code,university_email,first_name,last_name,account_status,faculty_id,department_id,program_id,semester_id,academic_year,enrollment_year)
   SELECT v.code, lower(v.code)||'@rsu.ac.th', v.fn, 'Student', 'ACTIVE', d.faculty_id, d.id, p.id, s.id, 2026, 2026
   FROM (VALUES ('STD-TEST-001','Test One'),('STD-TEST-002','Test Two')) v(code,fn)

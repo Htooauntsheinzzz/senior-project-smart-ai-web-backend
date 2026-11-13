@@ -50,7 +50,8 @@ class AcademicStudentIsolationTests extends GroundingIntegrationSupport {
         tool("get_my_schedule");
         answer("CS301: Tuesday 09:00-11:45, room 11-402.");
         String forB = ask(B, "What is my schedule?");
-        assertThat(forB).startsWith("Your recorded timetable:").contains("Monday 13:00-15:45, room 11-500")
+        // The backend's own reply renders the published timetable (D58): weekday, times, meeting type, room and building.
+        assertThat(forB).startsWith("Your recorded timetable:").contains("Monday 13:00-15:45 (lecture) in room 11-500")
                 .doesNotContain("11-402").doesNotContain("Tuesday");
     }
 

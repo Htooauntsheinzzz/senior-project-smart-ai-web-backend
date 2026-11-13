@@ -1,5 +1,6 @@
 package com.smartAiUniversityAssistant.seniorproject.feature.knowledge;
 
+import com.smartAiUniversityAssistant.seniorproject.MigrationVersions;
 import com.smartAiUniversityAssistant.seniorproject.IntegrationSupport;
 import java.util.*;
 import org.flywaydb.core.Flyway;
@@ -22,7 +23,7 @@ class KnowledgeSchemaMigrationTests extends IntegrationSupport {
         schema = "knowledge_" + UUID.randomUUID().toString().replace("-", "");
         flyway = Flyway.configure().dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
                 .defaultSchema(schema).schemas(schema).cleanDisabled(false).load();
-        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(47);
+        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(MigrationVersions.count());
         var dataSource = new DriverManagerDataSource(POSTGRES.getJdbcUrl() + "&currentSchema=" + schema,
                 POSTGRES.getUsername(), POSTGRES.getPassword());
         db = new JdbcTemplate(dataSource);
@@ -47,12 +48,13 @@ class KnowledgeSchemaMigrationTests extends IntegrationSupport {
                 SELECT c.conname, c.confdeltype FROM pg_constraint c JOIN pg_namespace n ON n.oid=c.connamespace
                 WHERE n.nspname=? AND c.contype='f' AND c.conrelid::regclass::text = ANY(?)
                 """, schema, TABLES.toArray(String[]::new));
-        assertThat(keys).hasSize(14);
+        assertThat(keys).hasSize(15);
         assertThat(keys).allSatisfy(key -> assertThat(key.get("confdeltype").toString()).isEqualTo("a"));
         assertThat(keys).extracting(key -> key.get("conname")).contains("fk_curriculum_versions_program",
                 "fk_academic_documents_category", "fk_academic_documents_curriculum", "fk_academic_documents_program",
                 "fk_academic_documents_department", "fk_academic_document_files_document",
-                "fk_academic_document_files_uploaded_by", "fk_academic_document_processing_file");
+                "fk_academic_document_files_uploaded_by", "fk_academic_document_processing_file",
+                "fk_academic_document_processing_queued_by");
     }
 
     @Test

@@ -636,8 +636,9 @@ class AcademicQueryIntegrationTests extends IntegrationSupport {
             for (Runnable call : List.<Runnable>of(queries::getMyEnrollments, queries::getMyCourses, queries::getMySchedule)) {
                 statistics.clear();
                 call.run();
-                // Student with placement, credential check, enrollments with every relationship, one meetings query.
-                assertThat(statistics.getPrepareStatementCount()).isLessThanOrEqualTo(4);
+                // Student with placement, credential check, enrollments with every relationship, one meetings query and, since
+                // the timetable (D58), one query for the exceptions of those meetings: five, however many sections there are.
+                assertThat(statistics.getPrepareStatementCount()).isLessThanOrEqualTo(5);
             }
             statistics.clear();
             queries.getMyAcademicProfile();

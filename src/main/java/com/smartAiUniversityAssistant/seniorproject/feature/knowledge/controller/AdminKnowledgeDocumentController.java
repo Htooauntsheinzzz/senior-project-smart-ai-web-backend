@@ -92,11 +92,15 @@ public class AdminKnowledgeDocumentController {
     public ResponseEntity<KnowledgeDocumentProcessingResponse> processing(@AuthenticationPrincipal AuthenticatedUser actor, @PathVariable Long id) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(documents.processing(actor, id));
     }
-    /** Reserved for the ingestion step; answers 503 DOCUMENT_PROCESSING_NOT_AVAILABLE until a worker can queue the file. */
+    /**
+     * Queues the current revision for the ingestion worker and answers 202 with the processing body at once. The
+     * optional body selects the mode (RESUME by default, or FULL); unknown values or properties are 400.
+     */
     @PostMapping("/{id}/reprocess")
-    public ResponseEntity<Void> reprocess(@AuthenticationPrincipal AuthenticatedUser actor, @PathVariable Long id) {
-        documents.reprocess(actor, id);
-        return ResponseEntity.accepted().cacheControl(CacheControl.noStore()).build();
+    public ResponseEntity<KnowledgeDocumentProcessingResponse> reprocess(@AuthenticationPrincipal AuthenticatedUser actor,
+            @PathVariable Long id, @RequestBody(required = false) tools.jackson.databind.JsonNode body) {
+        var mode = KnowledgeDocumentReprocessRequest.from(body).effectiveMode();
+        return ResponseEntity.accepted().cacheControl(CacheControl.noStore()).body(documents.reprocess(actor, id, mode));
     }
 
     /** Binding errors on the multipart form use the upload error code; JSON bodies keep VALIDATION_ERROR. */

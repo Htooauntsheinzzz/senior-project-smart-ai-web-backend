@@ -75,7 +75,30 @@ public class KnowledgeFailure extends RuntimeException {
     }
     public static KnowledgeFailure processingNotAvailable() {
         return new KnowledgeFailure(503, "DOCUMENT_PROCESSING_NOT_AVAILABLE",
-                "Document ingestion is not available yet. The document stays UPLOADED until the ingestion worker exists.");
+                "Document ingestion is not available.");
+    }
+    public static KnowledgeFailure processingAlreadyRunning() {
+        return new KnowledgeFailure(409, "DOCUMENT_PROCESSING_ALREADY_RUNNING",
+                "The document is already queued or being processed.");
+    }
+    public static KnowledgeFailure alreadyProcessed() {
+        return new KnowledgeFailure(409, "DOCUMENT_ALREADY_PROCESSED",
+                "The document is already processed. Use mode FULL to process it again.");
+    }
+    public static KnowledgeFailure pageNotFound() {
+        return new KnowledgeFailure(404, "DOCUMENT_PAGE_NOT_FOUND", "The requested document page does not exist.");
+    }
+    public static KnowledgeFailure chunkNotFound() {
+        return new KnowledgeFailure(404, "DOCUMENT_CHUNK_NOT_FOUND", "The requested document chunk does not exist.");
+    }
+    public static KnowledgeFailure searchNotConfigured() {
+        return new KnowledgeFailure(503, "KNOWLEDGE_SEARCH_NOT_CONFIGURED", "Semantic search is not configured.");
+    }
+    public static KnowledgeFailure searchUnavailable() {
+        return new KnowledgeFailure(503, "KNOWLEDGE_SEARCH_UNAVAILABLE", "Semantic search is temporarily unavailable.");
+    }
+    public static KnowledgeFailure searchRateLimited() {
+        return new KnowledgeFailure(429, "KNOWLEDGE_SEARCH_RATE_LIMITED", "Semantic search is busy. Try again shortly.");
     }
     public static KnowledgeFailure uploadDisabled() {
         return new KnowledgeFailure(503, "DOCUMENT_UPLOAD_DISABLED", "Knowledge document upload is disabled.");

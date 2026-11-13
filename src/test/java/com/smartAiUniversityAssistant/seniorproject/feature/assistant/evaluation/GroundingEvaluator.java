@@ -21,7 +21,7 @@ public final class GroundingEvaluator {
         boolean ok = t.httpStatus() == 200 && t.message() != null;
         String answer = ok ? t.message() : "";
         String input = c.finalTurn().input();
-        String evidence = t.toolResultsJson();
+        String evidence = IntentEvaluator.withMeetingTimeRanges(t.toolResultsJson());
         String queried = evidence + " " + t.toolCalls().stream().map(call -> String.valueOf(call.arguments())).reduce("", (a, b) -> a + " " + b);
         boolean fallback = StudentAssistantServiceImpl.UNGROUNDED_FALLBACK_MESSAGE.equals(answer);
         var expectations = dataset.step09();

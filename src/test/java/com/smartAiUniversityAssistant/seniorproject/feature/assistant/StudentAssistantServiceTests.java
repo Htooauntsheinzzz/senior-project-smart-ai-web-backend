@@ -73,7 +73,7 @@ class StudentAssistantServiceTests {
         when(llm.chat(any())).thenReturn(new LlmResponse("Hi", "m", null));
         var response = service.chat(new StudentAssistantChatRequest("Hello"));
         assertThat(response.conversationId()).isNull();
-        verify(conversations, never()).saveCompletedTurn(any(), any(), any(), any());
+        verify(conversations, never()).saveCompletedTurn(any(), any(), any(), any(), any());
 
         // A supplied conversationId is checked before any provider call.
         when(conversations.getOwnedConversation("9fa36c31-f92b-4d1e-9f4e-217d25362010", STUDENT_ID))

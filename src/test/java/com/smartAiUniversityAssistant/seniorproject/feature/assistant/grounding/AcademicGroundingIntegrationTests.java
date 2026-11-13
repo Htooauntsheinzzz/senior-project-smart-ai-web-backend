@@ -22,7 +22,9 @@ class AcademicGroundingIntegrationTests extends GroundingIntegrationSupport {
         var body = chat(A, null, "Who teaches CS301?");
         assertThat(body.get("message").stringValue()).isEqualTo("Your CS301 course is taught by Dr. John Smith.");
         // The Student API shape is unchanged: no evidence, status or grounding field is exposed.
-        assertThat(body.propertyNames()).containsExactlyInAnyOrder("message", "requestId", "conversationId", "model", "createdAt");
+        // Step 15A (D76): plus the additive sources array, empty for a database answer.
+        assertThat(body.propertyNames()).containsExactlyInAnyOrder("message", "requestId", "conversationId", "model", "createdAt", "sources");
+        assertThat(body.get("sources")).isEmpty();
         assertThat(output.getOut()).contains("ASSISTANT_GROUNDING requestId=" + body.get("requestId").stringValue()
                 + " event=GROUNDING_VERIFIED academicIntent=GET_MY_COURSE_LECTURER toolNames=[get_my_course_lecturer] "
                 + "groundingStatus=GROUNDED evidenceStatus=[VERIFIED] validationOutcome=GROUNDED fallbackUsed=false");

@@ -10,6 +10,6 @@ public class CampusNavEdgePoint {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
     @Column(name = "edge_id", nullable = false) private Long edgeId;
     @Column(name = "point_sequence", nullable = false) private int pointSequence;
-    @Column(name = "latitude", nullable = false, precision = 10, scale = 7) private BigDecimal latitude;
-    @Column(name = "longitude", nullable = false, precision = 10, scale = 7) private BigDecimal longitude;
+    @Column(name = "latitude", nullable = false, precision = 18, scale = 15) private BigDecimal latitude;
+    @Column(name = "longitude", nullable = false, precision = 18, scale = 15) private BigDecimal longitude;
 }

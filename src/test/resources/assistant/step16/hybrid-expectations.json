@@ -1,0 +1,48 @@
+{
+  "datasetVersion": "1.0",
+  "documents": {
+    "regulations": "Sample Academic Regulations 2026",
+    "curriculum": "Sample B.Sc. Computer Science Curriculum 2026"
+  },
+  "students": {
+    "STD-TEST-001": {
+      "cgpa": "2.57",
+      "creditsEarned": "18",
+      "currentEnrolledCredits": 9
+    },
+    "STD-TEST-002": {
+      "cgpa": null,
+      "creditsEarned": null,
+      "currentEnrolledCredits": 9
+    },
+    "STD-TEST-003": {
+      "cgpa": null,
+      "creditsEarned": null,
+      "currentEnrolledCredits": null
+    }
+  },
+  "minimumCases": {
+    "CREDITS_REMAINING": 5,
+    "GPA_STANDING": 3,
+    "COOP_ELIGIBILITY": 3,
+    "GRADUATION_STANDING": 3,
+    "MISSING_PROGRESS": 3,
+    "NO_PROGRAM_DOCUMENT": 2,
+    "DOCUMENT_NOT_FOUND": 2,
+    "SEARCH_MISSING": 3,
+    "FAULTY_CALCULATION": 4,
+    "FAULTY_CONCLUSION": 3,
+    "PROGRESS_UNAVAILABLE": 2,
+    "NOT_HYBRID": 3,
+    "LANGUAGE": 3
+  },
+  "minimumTotal": 42,
+  "otherProgramMarkers": [
+    "Sample B.Sc. Computer Science Curriculum 2026",
+    "132",
+    "CSC486"
+  ],
+  "otherStudentMarkers": [
+    "2.57"
+  ]
+}

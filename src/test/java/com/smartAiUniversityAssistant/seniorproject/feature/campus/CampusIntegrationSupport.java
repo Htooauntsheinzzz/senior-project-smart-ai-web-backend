@@ -76,7 +76,8 @@ public abstract class CampusIntegrationSupport extends IntegrationSupport {
     @AfterEach
     protected void clearCampusTables() {
         SecurityContextHolder.clearContext();
-        for (String table : List.of("campus_nav_destinations", "campus_nav_edge_points", "campus_nav_edges", "campus_nav_nodes",
+        // Meetings and their exceptions reference campus rooms; other classes may leave some behind.
+        for (String table : List.of("timetable_meeting_exceptions", "course_section_meetings", "campus_nav_destinations", "campus_nav_edge_points", "campus_nav_edges", "campus_nav_nodes",
                 "campus_opening_exceptions", "campus_opening_hours", "campus_room_facilities", "campus_place_facilities", "campus_facilities",
                 "campus_places", "campus_rooms", "campus_buildings", "campus_categories", "campus_sites"))
             db.update("DELETE FROM " + table);

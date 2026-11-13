@@ -33,8 +33,10 @@ class TimetableIntegrationTests extends IntegrationSupport {
     private static final String TIMETABLE = "/api/v1/admin/timetable";
     private static final String ADMIN_PASSWORD = "timetable admin test password";
     private static final String STUDENT_PASSWORD = "timetable student test password";
-    // Wednesday 2026-11-04 10:00 in Bangkok.
-    private static final Instant WEDNESDAY_10_BANGKOK = Instant.parse("2026-11-04T03:00:00Z");
+    // Wednesday 2054-11-04 10:00 in Bangkok. The dates of this class were 2026 dates moved by 28 years (same weekdays and
+    // leap years): Redis expires a login session at the test clock's time plus 7 days in real time, so a pinned date
+    // more than a week in the past logged every request out (401) from 2026-11-11 on.
+    private static final Instant WEDNESDAY_10_BANGKOK = Instant.parse("2054-11-04T03:00:00Z");
 
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
@@ -68,9 +70,9 @@ class TimetableIntegrationTests extends IntegrationSupport {
         lecturerB = id("INSERT INTO lectures(lecture_name_th,lecture_name_en,faculty_id,department_id,created_by) VALUES ('บี','Lecturer B',?,?,?) RETURNING id", faculty, department, actor);
         semester = id("INSERT INTO semesters(academic_year,semester_name_th,semester_name_en,created_by) VALUES (2026,'เทอม 1','Semester 1',?) RETURNING id", actor);
         semester2 = id("INSERT INTO semesters(academic_year,semester_name_th,semester_name_en,created_by) VALUES (2026,'เทอม 2','Semester 2',?) RETURNING id", actor);
-        term = term(semester, "2569", "2026-2027", "2026-08-01", "2026-12-31");
+        term = term(semester, "2569", "2026-2027", "2054-08-01", "2054-12-31");
         // A second term whose calendar dates overlap the first: physical conflicts must still be found across terms.
-        term2 = term(semester2, "2569", "2026-2027", "2026-11-01", "2027-03-31");
+        term2 = term(semester2, "2569", "2026-2027", "2054-11-01", "2055-03-31");
         courseA = course("CSC-452", "Mobile Programming");
         courseB = course("CSC-311", "Data Structures");
         courseC = course("CSC-999", "Other Course");
@@ -98,14 +100,14 @@ class TimetableIntegrationTests extends IntegrationSupport {
 
     @Test
     void academicTermCrudValidatesAndProtectsReferencedTerms() throws Exception {
-        var body = body("semesterId", semester, "academicYearCode", "2570", "academicYearLabel", "2027–2028", "startDate", "2027-08-01", "endDate", "2027-12-15");
+        var body = body("semesterId", semester, "academicYearCode", "2570", "academicYearLabel", "2027–2028", "startDate", "2055-08-01", "endDate", "2055-12-15");
         long created = idOf(post(academicToken, TERMS, body).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("PLANNED")).andExpect(jsonPath("$.semesterNameEn").value("Semester 1"))
                 .andExpect(jsonPath("$.displayLabel").value("Semester 1 / 2570")).andExpect(jsonPath("$.academicYearLabel").value("2027–2028")));
         post(superToken, TERMS, body).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("ACADEMIC_TERM_ALREADY_EXISTS"));
         var reversed = new HashMap<>(body);
         reversed.put("academicYearCode", "2571");
-        reversed.put("endDate", "2027-07-31");
+        reversed.put("endDate", "2055-07-31");
         post(superToken, TERMS, reversed).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("TIMETABLE_INVALID_DATE_RANGE"));
         var missing = new HashMap<>(body);
         missing.put("semesterId", 999999);
@@ -154,7 +156,7 @@ class TimetableIntegrationTests extends IntegrationSupport {
         post(superToken, TIMETABLE + "/meetings", meeting(sectionA, roomA, "LECTURE", 1, "11:00", "09:00")).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("TIMETABLE_INVALID_TIME"));
         var outside = meeting(sectionA, roomA, "LECTURE", 1, "09:00", "11:00");
-        outside.put("effectiveTo", "2027-01-15");
+        outside.put("effectiveTo", "2055-01-15");
         post(superToken, TIMETABLE + "/meetings", outside).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("TIMETABLE_INVALID_DATE_RANGE"));
         post(superToken, TIMETABLE + "/meetings", meeting(sectionA, 999999L, "LECTURE", 1, "09:00", "11:00")).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("TIMETABLE_ROOM_NOT_FOUND"));
@@ -163,22 +165,22 @@ class TimetableIntegrationTests extends IntegrationSupport {
         post(superToken, TIMETABLE + "/meetings", bogus).andExpect(status().isBadRequest()); // redundant identifiers are refused
         post(superToken, TIMETABLE + "/meetings", meeting(sectionA, roomA, "SEMINAR", 1, "09:00", "11:00")).andExpect(status().isBadRequest());
 
-        // Spec file 44: the enrollment due date may not be after the effective start date (2026-08-01 here).
+        // Spec file 44: the enrollment due date may not be after the effective start date (2054-08-01 here).
         var lateDue = meeting(sectionA, roomA, "LECTURE", 1, "09:00", "11:00");
-        lateDue.put("enrollmentDueDate", "2026-08-02");
+        lateDue.put("enrollmentDueDate", "2054-08-02");
         post(superToken, TIMETABLE + "/meetings", lateDue).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("TIMETABLE_INVALID_ENROLLMENT_DUE_DATE"));
-        lateDue.put("enrollmentDueDate", "2026-08-01");
+        lateDue.put("enrollmentDueDate", "2054-08-01");
         long withDue = idOf(post(superToken, TIMETABLE + "/meetings", lateDue).andExpect(status().isCreated())
-                .andExpect(jsonPath("$.enrollmentDueDate").value("2026-08-01")));
+                .andExpect(jsonPath("$.enrollmentDueDate").value("2054-08-01")));
         var movedDue = slot(roomA, "LECTURE", 1, "09:00", "11:00", null);
-        movedDue.put("enrollmentDueDate", "2026-09-01");
+        movedDue.put("enrollmentDueDate", "2054-09-01");
         put(superToken, TIMETABLE + "/meetings/" + withDue, movedDue).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("TIMETABLE_INVALID_ENROLLMENT_DUE_DATE"));
-        movedDue.put("enrollmentDueDate", "2026-07-25");
+        movedDue.put("enrollmentDueDate", "2054-07-25");
         put(superToken, TIMETABLE + "/meetings/" + withDue, movedDue).andExpect(status().isOk())
-                .andExpect(jsonPath("$.enrollmentDueDate").value("2026-07-25"));
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> db.update("UPDATE course_section_meetings SET enrollment_due_date=DATE '2026-08-02' WHERE id=?", withDue))
+                .andExpect(jsonPath("$.enrollmentDueDate").value("2054-07-25"));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> db.update("UPDATE course_section_meetings SET enrollment_due_date=DATE '2054-08-02' WHERE id=?", withDue))
                 .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
         mvc.perform(auth(MockMvcRequestBuilders.delete(TIMETABLE + "/meetings/" + withDue), superToken)).andExpect(status().isNoContent());
 
@@ -203,7 +205,7 @@ class TimetableIntegrationTests extends IntegrationSupport {
                 .andExpect(jsonPath("$[0].meetings[0].roomName").value("IT-301")).andExpect(jsonPath("$[0].meetings[0].buildingName").value("Building 11"))
                 .andExpect(jsonPath("$[0].meetings[0].campusId").value(site)).andExpect(jsonPath("$[0].meetings[0].dayOfWeek").value("MONDAY"))
                 .andExpect(jsonPath("$[0].meetings[0].dayOfWeekNumber").value(1));
-        get(studentToken, "/api/v1/student/academic/next-class").andExpect(jsonPath("$.startsAt").value("2026-11-09T09:00:00+07:00"))
+        get(studentToken, "/api/v1/student/academic/next-class").andExpect(jsonPath("$.startsAt").value("2054-11-09T09:00:00+07:00"))
                 .andExpect(jsonPath("$.roomName").value("IT-301")).andExpect(jsonPath("$.buildingName").value("Building 11"))
                 .andExpect(jsonPath("$.meetingId").value(id)).andExpect(jsonPath("$.scheduleBasis").value("PUBLISHED_TIMETABLE"));
         // Editing a published meeting keeps it published and re-validates.
@@ -211,7 +213,7 @@ class TimetableIntegrationTests extends IntegrationSupport {
                 .andExpect(jsonPath("$.code").value("TIMETABLE_PUBLISH_NOT_ALLOWED"));
         put(superToken, TIMETABLE + "/meetings/" + id, slot(roomB, "LECTURE", 2, "13:00", "15:00", null)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PUBLISHED")).andExpect(jsonPath("$.dayName").value("TUESDAY"));
-        get(studentToken, "/api/v1/student/academic/next-class").andExpect(jsonPath("$.startsAt").value("2026-11-10T13:00:00+07:00"));
+        get(studentToken, "/api/v1/student/academic/next-class").andExpect(jsonPath("$.startsAt").value("2054-11-10T13:00:00+07:00"));
         post(superToken, TIMETABLE + "/meetings/" + id + "/cancel", null).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
         get(studentToken, "/api/v1/student/academic/schedule").andExpect(jsonPath("$[0].meetings.length()").value(0));
         get(studentToken, "/api/v1/student/academic/next-class").andExpect(content().string("null"));
@@ -240,13 +242,13 @@ class TimetableIntegrationTests extends IntegrationSupport {
 
     @Test
     void publishingRejectsRoomLecturerAndSectionConflictsAndAllowsTheRest() throws Exception {
-        long a = published(sectionA, roomA, 1, "09:00", "11:00", "2026-08-01", "2026-12-15");
+        long a = published(sectionA, roomA, 1, "09:00", "11:00", "2054-08-01", "2054-12-15");
         // Same lecturer (A teaches both sections), other room.
         var sameLecturer = meeting(sectionB, roomB, "LECTURE", 1, "10:00", "12:00");
         post(superToken, TIMETABLE + "/conflicts/check", check(sameLecturer, null)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.hasConflicts").value(true)).andExpect(jsonPath("$.totalConflicts").value(1))
                 .andExpect(jsonPath("$.conflicts[0].type").value("LECTURER_CONFLICT")).andExpect(jsonPath("$.conflicts[0].conflictingMeetingId").value(a))
-                .andExpect(jsonPath("$.conflicts[0].date").value("2026-08-03")).andExpect(jsonPath("$.conflicts[0].overlapStart").value("10:00"))
+                .andExpect(jsonPath("$.conflicts[0].date").value("2054-08-03")).andExpect(jsonPath("$.conflicts[0].overlapStart").value("10:00"))
                 .andExpect(jsonPath("$.conflicts[0].overlapEnd").value("11:00"));
         long b = idOf(post(superToken, TIMETABLE + "/meetings", sameLecturer).andExpect(status().isCreated())); // drafts may overlap
         post(superToken, TIMETABLE + "/meetings/" + b + "/publish", null).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("TIMETABLE_LECTURER_CONFLICT"));
@@ -266,27 +268,27 @@ class TimetableIntegrationTests extends IntegrationSupport {
 
     @Test
     void effectiveDatesCrossTermsAndExceptionsDecideRealConflicts() throws Exception {
-        long a = published(sectionA, roomA, 1, "09:00", "11:00", "2026-08-01", "2026-10-31");
+        long a = published(sectionA, roomA, 1, "09:00", "11:00", "2054-08-01", "2054-10-31");
         // Same room and slot but the date ranges never meet.
-        long later = draft(sectionC, roomA, 1, "09:00", "11:00", "2026-11-02", "2026-12-15");
+        long later = draft(sectionC, roomA, 1, "09:00", "11:00", "2054-11-02", "2054-12-15");
         post(superToken, TIMETABLE + "/meetings/" + later + "/publish", null).andExpect(status().isOk());
         // One shared week is enough for a conflict.
-        long overlapping = draft(sectionC, roomA, 1, "09:00", "11:00", "2026-10-26", "2026-11-01");
+        long overlapping = draft(sectionC, roomA, 1, "09:00", "11:00", "2054-10-26", "2054-11-01");
         post(superToken, TIMETABLE + "/meetings/" + overlapping + "/publish", null).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("TIMETABLE_ROOM_CONFLICT"));
-        // A shared week whose Monday falls outside both ranges is no conflict: a's last Monday is 2026-10-26, this starts Tuesday 2026-10-27.
-        long tuesdayStart = draft(sectionC, roomA, 1, "09:00", "11:00", "2026-10-27", "2026-11-01");
+        // A shared week whose Monday falls outside both ranges is no conflict: a's last Monday is 2054-10-26, this starts Tuesday 2054-10-27.
+        long tuesdayStart = draft(sectionC, roomA, 1, "09:00", "11:00", "2054-10-27", "2054-11-01");
         post(superToken, TIMETABLE + "/meetings/" + tuesdayStart + "/publish", null).andExpect(status().isOk());
         // Cross-term: section in term2 uses the same physical room while 'later' is published.
         long sectionTerm2 = section(courseC, "03", lecturerA, semester2, term2);
-        long cross = draft(sectionTerm2, roomA, 1, "10:00", "11:00", "2026-11-02", "2026-11-30");
+        long cross = draft(sectionTerm2, roomA, 1, "10:00", "11:00", "2054-11-02", "2054-11-30");
         post(superToken, TIMETABLE + "/meetings/" + cross + "/publish", null).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("TIMETABLE_ROOM_CONFLICT"));
         // Cancelling every clashing occurrence of 'later' removes the conflict; rescheduling one back into the slot restores it.
-        for (String date : List.of("2026-11-02", "2026-11-09", "2026-11-16", "2026-11-23", "2026-11-30"))
+        for (String date : List.of("2054-11-02", "2054-11-09", "2054-11-16", "2054-11-23", "2054-11-30"))
             post(superToken, TIMETABLE + "/meetings/" + later + "/exceptions", body("originalDate", date, "exceptionType", "CANCELLED", "reason", "Field trip"))
                     .andExpect(status().isCreated());
         post(superToken, TIMETABLE + "/meetings/" + cross + "/publish", null).andExpect(status().isOk());
-        post(superToken, TIMETABLE + "/meetings/" + later + "/exceptions", body("originalDate", "2026-12-07", "exceptionType", "RESCHEDULED",
-                "replacementDate", "2026-11-09", "replacementStartTime", "10:00", "replacementEndTime", "11:00")).andExpect(status().isConflict())
+        post(superToken, TIMETABLE + "/meetings/" + later + "/exceptions", body("originalDate", "2054-12-07", "exceptionType", "RESCHEDULED",
+                "replacementDate", "2054-11-09", "replacementStartTime", "10:00", "replacementEndTime", "11:00")).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("TIMETABLE_ROOM_CONFLICT"));
         // GET /conflicts and statistics derive the same pairs from stored rows (one is forced in by SQL).
         db.update("UPDATE course_section_meetings SET room_id=? WHERE id=?", roomA, cross);
@@ -294,9 +296,9 @@ class TimetableIntegrationTests extends IntegrationSupport {
         get(superToken, TIMETABLE + "/conflicts").andExpect(status().isOk()).andExpect(jsonPath("$.total").value(1))
                 .andExpect(jsonPath("$.conflicts[0].type").value("ROOM_CONFLICT")).andExpect(jsonPath("$.conflicts[0].meetingA.meetingId").value(later))
                 .andExpect(jsonPath("$.conflicts[0].meetingB.meetingId").value(cross)).andExpect(jsonPath("$.conflicts[0].occurrenceCount").value(5))
-                .andExpect(jsonPath("$.conflicts[0].firstDate").value("2026-11-02")).andExpect(jsonPath("$.conflicts[0].roomNumber").value("IT-301"));
+                .andExpect(jsonPath("$.conflicts[0].firstDate").value("2054-11-02")).andExpect(jsonPath("$.conflicts[0].roomNumber").value("IT-301"));
         get(superToken, TIMETABLE + "/conflicts?type=LECTURER_CONFLICT").andExpect(jsonPath("$.total").value(0));
-        get(superToken, TIMETABLE + "/conflicts?weekStart=2026-12-07").andExpect(jsonPath("$.total").value(0));
+        get(superToken, TIMETABLE + "/conflicts?weekStart=2054-12-07").andExpect(jsonPath("$.total").value(0));
         get(superToken, TIMETABLE + "/conflicts?roomId=" + roomB).andExpect(jsonPath("$.total").value(0));
         get(superToken, TIMETABLE + "/statistics").andExpect(jsonPath("$.totalMeetings").value(5)).andExpect(jsonPath("$.publishedMeetings").value(4))
                 .andExpect(jsonPath("$.draftMeetings").value(1)).andExpect(jsonPath("$.cancelledMeetings").value(0)).andExpect(jsonPath("$.conflictCount").value(1));
@@ -330,67 +332,67 @@ class TimetableIntegrationTests extends IntegrationSupport {
 
     @Test
     void calendarGeneratesDatedOccurrencesWithExceptionsApplied() throws Exception {
-        long lecture = published(sectionA, roomA, 1, "09:00", "11:45", "2026-08-01", "2026-12-15");
-        long lab = published(sectionA, roomLab, 4, "14:00", "16:00", "2026-08-01", "2026-12-15");
-        long sunday = published(sectionC, roomB, 7, "08:00", "09:00", "2026-11-15", "2026-11-15"); // Sunday is supported
+        long lecture = published(sectionA, roomA, 1, "09:00", "11:45", "2054-08-01", "2054-12-15");
+        long lab = published(sectionA, roomLab, 4, "14:00", "16:00", "2054-08-01", "2054-12-15");
+        long sunday = published(sectionC, roomB, 7, "08:00", "09:00", "2054-11-15", "2054-11-15"); // Sunday is supported
         long draftOnly = draft(sectionC, roomB, 2, "08:00", "09:00");
-        long ended = published(sectionC, roomB, 1, "13:00", "14:00", "2026-08-01", "2026-10-31");
-        post(superToken, TIMETABLE + "/meetings/" + lecture + "/exceptions", body("originalDate", "2026-11-09", "exceptionType", "CANCELLED", "reason", "Holiday"))
+        long ended = published(sectionC, roomB, 1, "13:00", "14:00", "2054-08-01", "2054-10-31");
+        post(superToken, TIMETABLE + "/meetings/" + lecture + "/exceptions", body("originalDate", "2054-11-09", "exceptionType", "CANCELLED", "reason", "Holiday"))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.exceptionType").value("CANCELLED"));
-        post(superToken, TIMETABLE + "/meetings/" + lab + "/exceptions", body("originalDate", "2026-11-12", "exceptionType", "RESCHEDULED",
-                "replacementDate", "2026-11-13", "replacementStartTime", "10:00", "replacementEndTime", "12:00", "replacementRoomId", roomB))
+        post(superToken, TIMETABLE + "/meetings/" + lab + "/exceptions", body("originalDate", "2054-11-12", "exceptionType", "RESCHEDULED",
+                "replacementDate", "2054-11-13", "replacementStartTime", "10:00", "replacementEndTime", "12:00", "replacementRoomId", roomB))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.replacementRoomNumber").value("IT-302"));
         // A Wednesday is normalized to its Monday; the week carries the cancelled slot, the moved lab and Sunday's class.
-        var week = tree(get(superToken, TIMETABLE + "/calendar?weekStart=2026-11-11").andExpect(status().isOk())
-                .andExpect(jsonPath("$.weekStart").value("2026-11-09")).andExpect(jsonPath("$.weekEnd").value("2026-11-15"))
+        var week = tree(get(superToken, TIMETABLE + "/calendar?weekStart=2054-11-11").andExpect(status().isOk())
+                .andExpect(jsonPath("$.weekStart").value("2054-11-09")).andExpect(jsonPath("$.weekEnd").value("2054-11-15"))
                 .andExpect(jsonPath("$.timezone").value("Asia/Bangkok")).andExpect(jsonPath("$.events.length()").value(4)).andReturn());
         var events = week.get("events");
         assertThat(events.get(0).get("meetingId").asLong()).isEqualTo(lecture);
         assertThat(events.get(0).get("occurrenceStatus").asText()).isEqualTo("CANCELLED");
-        assertThat(events.get(0).get("startsAt").asText()).isEqualTo("2026-11-09T09:00:00+07:00");
+        assertThat(events.get(0).get("startsAt").asText()).isEqualTo("2054-11-09T09:00:00+07:00");
         assertThat(events.get(1).get("meetingId").asLong()).isEqualTo(draftOnly);
         assertThat(events.get(1).get("status").asText()).isEqualTo("DRAFT");
         assertThat(events.get(2).get("meetingId").asLong()).isEqualTo(lab);
         assertThat(events.get(2).get("occurrenceStatus").asText()).isEqualTo("RESCHEDULED");
-        assertThat(events.get(2).get("date").asText()).isEqualTo("2026-11-13");
-        assertThat(events.get(2).get("originalDate").asText()).isEqualTo("2026-11-12");
+        assertThat(events.get(2).get("date").asText()).isEqualTo("2054-11-13");
+        assertThat(events.get(2).get("originalDate").asText()).isEqualTo("2054-11-12");
         assertThat(events.get(2).get("roomNumber").asText()).isEqualTo("IT-302");
-        assertThat(events.get(2).get("endsAt").asText()).isEqualTo("2026-11-13T12:00:00+07:00");
+        assertThat(events.get(2).get("endsAt").asText()).isEqualTo("2054-11-13T12:00:00+07:00");
         assertThat(events.get(3).get("meetingId").asLong()).isEqualTo(sunday);
-        assertThat(events.get(3).get("date").asText()).isEqualTo("2026-11-15");
+        assertThat(events.get(3).get("date").asText()).isEqualTo("2054-11-15");
         // Filters: status, faculty via course, campus via room, room, lecturer; the ended meeting is outside the week.
-        get(superToken, TIMETABLE + "/calendar?weekStart=2026-11-09&status=PUBLISHED").andExpect(jsonPath("$.events.length()").value(3));
+        get(superToken, TIMETABLE + "/calendar?weekStart=2054-11-09&status=PUBLISHED").andExpect(jsonPath("$.events.length()").value(3));
         // Room filters follow the meeting's own room: the lab moved into IT-302 for one day is not an IT-302 meeting.
-        get(superToken, TIMETABLE + "/calendar?weekStart=2026-11-09&roomId=" + roomB).andExpect(jsonPath("$.events.length()").value(2));
-        get(superToken, TIMETABLE + "/calendar?weekStart=2026-11-09&campusId=" + site).andExpect(jsonPath("$.events.length()").value(4));
-        get(superToken, TIMETABLE + "/calendar?weekStart=2026-11-09&campusId=999999").andExpect(jsonPath("$.events.length()").value(0));
-        get(superToken, TIMETABLE + "/calendar?weekStart=2026-11-09&lecturerId=" + lecturerB).andExpect(jsonPath("$.events.length()").value(2));
-        get(superToken, TIMETABLE + "/calendar?weekStart=2026-11-09&facultyId=" + faculty + "&departmentId=" + department + "&courseId=" + courseA)
+        get(superToken, TIMETABLE + "/calendar?weekStart=2054-11-09&roomId=" + roomB).andExpect(jsonPath("$.events.length()").value(2));
+        get(superToken, TIMETABLE + "/calendar?weekStart=2054-11-09&campusId=" + site).andExpect(jsonPath("$.events.length()").value(4));
+        get(superToken, TIMETABLE + "/calendar?weekStart=2054-11-09&campusId=999999").andExpect(jsonPath("$.events.length()").value(0));
+        get(superToken, TIMETABLE + "/calendar?weekStart=2054-11-09&lecturerId=" + lecturerB).andExpect(jsonPath("$.events.length()").value(2));
+        get(superToken, TIMETABLE + "/calendar?weekStart=2054-11-09&facultyId=" + faculty + "&departmentId=" + department + "&courseId=" + courseA)
                 .andExpect(jsonPath("$.events.length()").value(2));
-        get(superToken, TIMETABLE + "/calendar?weekStart=2026-10-26").andExpect(jsonPath("$.events.length()").value(4)); // lecture, draft, lab, ended
-        get(superToken, TIMETABLE + "/calendar?weekStart=2026-12-21").andExpect(jsonPath("$.events.length()").value(0));
+        get(superToken, TIMETABLE + "/calendar?weekStart=2054-10-26").andExpect(jsonPath("$.events.length()").value(4)); // lecture, draft, lab, ended
+        get(superToken, TIMETABLE + "/calendar?weekStart=2054-12-21").andExpect(jsonPath("$.events.length()").value(0));
         get(superToken, TIMETABLE + "/calendar?weekStart=not-a-date").andExpect(status().isBadRequest());
-        // Without weekStart the current week (Wednesday 2026-11-04 in Bangkok) is used.
-        get(superToken, TIMETABLE + "/calendar").andExpect(jsonPath("$.weekStart").value("2026-11-02")).andExpect(jsonPath("$.events.length()").value(3));
+        // Without weekStart the current week (Wednesday 2054-11-04 in Bangkok) is used.
+        get(superToken, TIMETABLE + "/calendar").andExpect(jsonPath("$.weekStart").value("2054-11-02")).andExpect(jsonPath("$.events.length()").value(3));
         // Students: on Wednesday the 4th the next class is Thursday's regular lab.
-        get(studentToken, "/api/v1/student/academic/next-class").andExpect(jsonPath("$.startsAt").value("2026-11-05T14:00:00+07:00"));
-        clock.set(Instant.parse("2026-11-08T00:00:00Z")); // Sunday: Monday 9th is cancelled, Thursday 12th moved to Friday 13th 10:00
+        get(studentToken, "/api/v1/student/academic/next-class").andExpect(jsonPath("$.startsAt").value("2054-11-05T14:00:00+07:00"));
+        clock.set(Instant.parse("2054-11-08T00:00:00Z")); // Sunday: Monday 9th is cancelled, Thursday 12th moved to Friday 13th 10:00
         studentToken = studentLogin("6600101"); // the access token lifetime follows the test clock
-        get(studentToken, "/api/v1/student/academic/next-class").andExpect(jsonPath("$.startsAt").value("2026-11-13T10:00:00+07:00"))
-                .andExpect(jsonPath("$.occurrenceStatus").value("RESCHEDULED")).andExpect(jsonPath("$.originalDate").value("2026-11-12"))
+        get(studentToken, "/api/v1/student/academic/next-class").andExpect(jsonPath("$.startsAt").value("2054-11-13T10:00:00+07:00"))
+                .andExpect(jsonPath("$.occurrenceStatus").value("RESCHEDULED")).andExpect(jsonPath("$.originalDate").value("2054-11-12"))
                 .andExpect(jsonPath("$.roomName").value("IT-302")).andExpect(jsonPath("$.dayOfWeek").value("FRIDAY"));
         get(studentToken, "/api/v1/student/academic/schedule").andExpect(jsonPath("$[0].meetings.length()").value(2))
-                .andExpect(jsonPath("$[0].meetings[0].exceptions[0].originalDate").value("2026-11-09"))
+                .andExpect(jsonPath("$[0].meetings[0].exceptions[0].originalDate").value("2054-11-09"))
                 .andExpect(jsonPath("$[0].meetings[0].exceptions[0].exceptionType").value("CANCELLED"))
-                .andExpect(jsonPath("$[0].meetings[1].exceptions[0].replacementDate").value("2026-11-13"))
+                .andExpect(jsonPath("$[0].meetings[1].exceptions[0].replacementDate").value("2054-11-13"))
                 .andExpect(jsonPath("$[0].meetings[1].exceptions[0].roomNumber").value("IT-302"));
     }
 
     @Test
     void listViewPagesFiltersSortsAndSearches() throws Exception {
-        long a = published(sectionA, roomA, 1, "09:00", "11:45", "2026-08-01", "2026-12-15");
+        long a = published(sectionA, roomA, 1, "09:00", "11:45", "2054-08-01", "2054-12-15");
         long b = draft(sectionB, roomB, 3, "13:00", "15:00");
-        long c = published(sectionC, roomLab, 1, "08:00", "09:00", "2026-08-01", "2026-12-15");
+        long c = published(sectionC, roomLab, 1, "08:00", "09:00", "2054-08-01", "2054-12-15");
         get(superToken, TIMETABLE + "/meetings").andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(3))
                 .andExpect(jsonPath("$.content[0].id").value(a)).andExpect(jsonPath("$.content[1].id").value(c)).andExpect(jsonPath("$.content[2].id").value(b))
                 .andExpect(jsonPath("$.content[1].courseCode").value("CSC-999")).andExpect(jsonPath("$.content[1].roomNumber").value("IT-LAB-01"))
@@ -442,33 +444,33 @@ class TimetableIntegrationTests extends IntegrationSupport {
 
     @Test
     void exceptionsValidateOccurrencesAndTermDates() throws Exception {
-        long lecture = published(sectionA, roomA, 1, "09:00", "11:45", "2026-08-01", "2026-12-15");
+        long lecture = published(sectionA, roomA, 1, "09:00", "11:45", "2054-08-01", "2054-12-15");
         String path = TIMETABLE + "/meetings/" + lecture + "/exceptions";
-        post(superToken, path, body("originalDate", "2026-11-10", "exceptionType", "CANCELLED")).andExpect(status().isBadRequest())
+        post(superToken, path, body("originalDate", "2054-11-10", "exceptionType", "CANCELLED")).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("TIMETABLE_EXCEPTION_INVALID")); // a Tuesday
-        post(superToken, path, body("originalDate", "2026-12-21", "exceptionType", "CANCELLED")).andExpect(status().isBadRequest()); // after effectiveTo
-        post(superToken, path, body("originalDate", "2026-11-09", "exceptionType", "CANCELLED", "replacementDate", "2026-11-10")).andExpect(status().isBadRequest());
-        post(superToken, path, body("originalDate", "2026-11-09", "exceptionType", "RESCHEDULED", "replacementDate", "2026-11-10")).andExpect(status().isBadRequest());
-        post(superToken, path, body("originalDate", "2026-11-09", "exceptionType", "RESCHEDULED", "replacementDate", "2027-01-05",
+        post(superToken, path, body("originalDate", "2054-12-21", "exceptionType", "CANCELLED")).andExpect(status().isBadRequest()); // after effectiveTo
+        post(superToken, path, body("originalDate", "2054-11-09", "exceptionType", "CANCELLED", "replacementDate", "2054-11-10")).andExpect(status().isBadRequest());
+        post(superToken, path, body("originalDate", "2054-11-09", "exceptionType", "RESCHEDULED", "replacementDate", "2054-11-10")).andExpect(status().isBadRequest());
+        post(superToken, path, body("originalDate", "2054-11-09", "exceptionType", "RESCHEDULED", "replacementDate", "2055-01-05",
                 "replacementStartTime", "09:00", "replacementEndTime", "11:00")).andExpect(status().isBadRequest()); // outside the term
-        post(superToken, path, body("originalDate", "2026-11-09", "exceptionType", "RESCHEDULED", "replacementDate", "2026-11-10",
+        post(superToken, path, body("originalDate", "2054-11-09", "exceptionType", "RESCHEDULED", "replacementDate", "2054-11-10",
                 "replacementStartTime", "09:00", "replacementEndTime", "11:00", "replacementRoomId", 999999)).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("TIMETABLE_ROOM_NOT_FOUND"));
-        long moved = idOf(post(superToken, path, body("originalDate", "2026-11-09", "exceptionType", "RESCHEDULED", "replacementDate", "2026-11-10",
+        long moved = idOf(post(superToken, path, body("originalDate", "2054-11-09", "exceptionType", "RESCHEDULED", "replacementDate", "2054-11-10",
                 "replacementStartTime", "09:00", "replacementEndTime", "11:00", "reason", "Lecturer away")).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.replacementRoomId").value(org.hamcrest.Matchers.nullValue())));
-        post(superToken, path, body("originalDate", "2026-11-09", "exceptionType", "CANCELLED")).andExpect(status().isConflict()); // one per occurrence
+        post(superToken, path, body("originalDate", "2054-11-09", "exceptionType", "CANCELLED")).andExpect(status().isConflict()); // one per occurrence
         get(superToken, path).andExpect(jsonPath("$.length()").value(1)).andExpect(jsonPath("$[0].reason").value("Lecturer away"));
-        get(studentToken, "/api/v1/student/academic/next-class").andExpect(jsonPath("$.startsAt").value("2026-11-10T09:00:00+07:00"))
+        get(studentToken, "/api/v1/student/academic/next-class").andExpect(jsonPath("$.startsAt").value("2054-11-10T09:00:00+07:00"))
                 .andExpect(jsonPath("$.roomName").value("IT-301")); // the meeting's own room is reused
-        put(superToken, path + "/" + moved, body("originalDate", "2026-11-09", "exceptionType", "CANCELLED", "reason", "Cancelled instead")).andExpect(status().isOk())
+        put(superToken, path + "/" + moved, body("originalDate", "2054-11-09", "exceptionType", "CANCELLED", "reason", "Cancelled instead")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.exceptionType").value("CANCELLED")).andExpect(jsonPath("$.replacementDate").value(org.hamcrest.Matchers.nullValue()));
-        get(studentToken, "/api/v1/student/academic/next-class").andExpect(jsonPath("$.startsAt").value("2026-11-16T09:00:00+07:00"));
+        get(studentToken, "/api/v1/student/academic/next-class").andExpect(jsonPath("$.startsAt").value("2054-11-16T09:00:00+07:00"));
         mvc.perform(auth(delete(path + "/" + moved), superToken)).andExpect(status().isNoContent());
-        get(studentToken, "/api/v1/student/academic/next-class").andExpect(jsonPath("$.startsAt").value("2026-11-09T09:00:00+07:00"));
+        get(studentToken, "/api/v1/student/academic/next-class").andExpect(jsonPath("$.startsAt").value("2054-11-09T09:00:00+07:00"));
         get(superToken, path + "/" + moved).andExpect(status().isMethodNotAllowed());
-        put(superToken, path + "/" + moved, body("originalDate", "2026-11-09", "exceptionType", "CANCELLED")).andExpect(status().isNotFound());
-        post(studentToken, path, body("originalDate", "2026-11-16", "exceptionType", "CANCELLED")).andExpect(status().isForbidden());
+        put(superToken, path + "/" + moved, body("originalDate", "2054-11-09", "exceptionType", "CANCELLED")).andExpect(status().isNotFound());
+        post(studentToken, path, body("originalDate", "2054-11-16", "exceptionType", "CANCELLED")).andExpect(status().isForbidden());
     }
 
     // Helpers
@@ -479,7 +481,7 @@ class TimetableIntegrationTests extends IntegrationSupport {
         return id;
     }
     private long draft(long section, Long room, int day, String start, String end) throws Exception {
-        return draft(section, room, day, start, end, "2026-08-01", "2026-12-15");
+        return draft(section, room, day, start, end, "2054-08-01", "2054-12-15");
     }
     private long draft(long section, Long room, int day, String start, String end, String from, String to) throws Exception {
         var body = meeting(section, room, "LECTURE", day, start, end);
@@ -489,11 +491,11 @@ class TimetableIntegrationTests extends IntegrationSupport {
     }
     private static Map<String, Object> meeting(long section, Long room, String type, int day, String start, String end) {
         return body("courseSectionId", section, "roomId", room, "meetingType", type, "dayOfWeek", day, "startTime", start, "endTime", end,
-                "effectiveFrom", "2026-08-01", "effectiveTo", "2026-12-15");
+                "effectiveFrom", "2054-08-01", "effectiveTo", "2054-12-15");
     }
     private static Map<String, Object> slot(Long room, String type, int day, String start, String end, String notes) {
-        return body("roomId", room, "meetingType", type, "dayOfWeek", day, "startTime", start, "endTime", end, "effectiveFrom", "2026-08-01",
-                "effectiveTo", "2026-12-15", "notes", notes);
+        return body("roomId", room, "meetingType", type, "dayOfWeek", day, "startTime", start, "endTime", end, "effectiveFrom", "2054-08-01",
+                "effectiveTo", "2054-12-15", "notes", notes);
     }
     private static Map<String, Object> check(Map<String, Object> meeting, Long meetingId) {
         var body = new LinkedHashMap<>(meeting);
@@ -544,7 +546,7 @@ class TimetableIntegrationTests extends IntegrationSupport {
         return id;
     }
     private void enroll(long student, long section, String status) {
-        db.update("INSERT INTO enrollments(student_id,course_section_id,enrollment_date,status,created_by) VALUES (?,?,DATE '2026-08-15',?,?)", student, section, status, actor);
+        db.update("INSERT INTO enrollments(student_id,course_section_id,enrollment_date,status,created_by) VALUES (?,?,DATE '2054-08-15',?,?)", student, section, status, actor);
     }
     private String adminLogin(String email) throws Exception {
         var result = mvc.perform(MockMvcRequestBuilders.post("/api/v1/admin/auth/login").contentType(MediaType.APPLICATION_JSON)

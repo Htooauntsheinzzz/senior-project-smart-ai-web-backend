@@ -1,0 +1,102 @@
+SAMPLE DATA FOR DEVELOPMENT ONLY — NOT AN OFFICIAL UNIVERSITY DOCUMENT
+
+Sample University, Bachelor of Science Program in Computer Science (fictional), Curriculum 2026
+
+Section 1 Program Overview
+
+The program leads to the degree Bachelor of Science (Computer Science). It is a four-year program with eight regular semesters. The maximum period of study is eight academic years.
+
+A student must complete at least 132 credits to graduate from this program.
+
+Section 2 Curriculum Structure
+
+The 132 credits of the program are divided into three groups of courses.
+
+Course group | Credits
+General education courses | 30
+Specialized courses | 96
+Free elective courses | 6
+
+The 96 credits of specialized courses are divided into four parts.
+
+Specialized course part | Credits
+Core courses | 30
+Major required courses | 45
+Major elective courses | 15
+Cooperative education | 6
+
+Section 3 Major Required Courses
+
+A student must pass all major required courses. Together they are 45 credits.
+
+Course code | Course title | Credits
+CS201 | Programming Fundamentals | 3
+CS202 | Object-Oriented Programming | 3
+CS301 | Data Structures | 3
+CS302 | Algorithm Design and Analysis | 3
+CS311 | Database Systems | 3
+CS321 | Operating Systems | 3
+CS331 | Computer Networks | 3
+CS341 | Software Engineering | 3
+CSC411 | Information Security | 3
+CSC421 | Artificial Intelligence | 3
+CSC431 | Distributed Systems | 3
+CSC452 | Mobile Programming | 3
+CSC453 | Web Programming | 3
+CSC481 | Senior Project 1 | 3
+CSC482 | Senior Project 2 | 3
+
+Section 4 Major Elective Courses
+
+A student must complete at least 15 credits of major elective courses, chosen from the list below. Every course in the list is 3 credits. A course that is not in the list counts as a major elective only with written approval of the program committee. Not every elective course is offered in every semester.
+
+Course code | Course title | Credits
+CSC461 | Machine Learning | 3
+CSC462 | Deep Learning | 3
+CSC463 | Natural Language Processing | 3
+CSC464 | Computer Vision | 3
+CSC465 | Data Mining | 3
+CSC466 | Big Data Analytics | 3
+CSC467 | Data Visualization | 3
+CSC471 | Internet of Things | 3
+CSC472 | Embedded Systems | 3
+CSC473 | Game Development | 3
+CSC474 | Computer Graphics | 3
+CSC475 | Human-Computer Interaction | 3
+CSC476 | Software Testing | 3
+CSC477 | DevOps Engineering | 3
+CSC478 | Blockchain Technology | 3
+CSC479 | Digital Forensics | 3
+CSC483 | Ethical Hacking | 3
+CSC484 | Network Security | 3
+CSC485 | Parallel Computing | 3
+CSC486 | Compiler Construction | 3
+CSC487 | Quantum Computing | 3
+CSC488 | Bioinformatics | 3
+CSC489 | Robotics | 3
+CSC492 | Selected Topics in Computer Science | 3
+
+The program committee reviews the list of major elective courses every academic year and announces changes before the registration period.
+
+Section 5 Cooperative Education and Internship
+
+Every student must pass CSC490 Cooperative Education, 6 credits. Cooperative education is 16 weeks of full-time work at an approved organization, normally in the first semester of the fourth year.
+
+To register for CSC490 a student must have earned at least 90 credits and must have a cumulative grade point average of at least 2.00.
+
+A student who cannot take part in cooperative education may, with approval of the program committee, take CSC491 Internship, 3 credits, with at least 240 working hours in the summer session, together with one additional major elective course of 3 credits.
+
+Section 6 Graduation Requirements
+
+A student graduates from this program when all of these conditions are met:
+(1) The student has completed at least 132 credits as required by the curriculum structure in Section 2.
+(2) The student has a cumulative grade point average of at least 2.00.
+(3) The student has a grade point average of at least 2.00 in the major required courses.
+(4) The student has passed cooperative education or the internship option of Section 5.
+(5) The student has no outstanding debt to the university.
+
+หมวด 7 สหกิจศึกษา (สรุปภาษาไทย)
+
+นักศึกษาทุกคนต้องผ่านรายวิชา CSC490 สหกิจศึกษา จำนวน 6 หน่วยกิต โดยปฏิบัติงานเต็มเวลา 16 สัปดาห์ในสถานประกอบการที่ได้รับอนุมัติ
+
+นักศึกษาที่จะลงทะเบียนรายวิชา CSC490 ต้องมีหน่วยกิตสะสมไม่น้อยกว่า 90 หน่วยกิต และมีเกรดเฉลี่ยสะสมไม่ต่ำกว่า 2.00

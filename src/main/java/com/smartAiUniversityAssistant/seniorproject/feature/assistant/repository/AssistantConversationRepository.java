@@ -13,7 +13,8 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Step 10 conversations: one JSON STRING per conversation at {@code student:assistant:conversation:<conversationId>},
- * expiring by Redis TTL (no cleanup job, nothing in PostgreSQL). Writes are atomic: a new conversation is created
+ * expiring by Redis TTL (no cleanup job). Since Step 17 the history lives in PostgreSQL (assistant_conversations); this
+ * value stays the short-term context. Writes are atomic: a new conversation is created
  * only if the key is absent, and a follow-up replaces the value only while the stored version is still the one the
  * request loaded. Redis failures surface as {@link org.springframework.dao.DataAccessException}.
  */
@@ -66,6 +67,11 @@ public class AssistantConversationRepository {
                 Long.toString(expectedVersion), serialize(context), Long.toString(ttl.toMillis()));
         if (result == null) throw new IllegalStateException("Conversation save returned no result");
         return result == 1L ? SaveResult.SAVED : result == 0L ? SaveResult.CONFLICT : SaveResult.MISSING;
+    }
+
+    /** Step 17: removes the context of a conversation the Student deleted. */
+    public void delete(String conversationId) {
+        redis.delete(key(conversationId));
     }
 
     public String serialize(AssistantConversationContext context) {

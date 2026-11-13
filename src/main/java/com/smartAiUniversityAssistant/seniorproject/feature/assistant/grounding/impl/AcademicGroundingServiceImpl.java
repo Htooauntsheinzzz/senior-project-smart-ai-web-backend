@@ -5,6 +5,7 @@ import static com.smartAiUniversityAssistant.seniorproject.feature.assistant.gro
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.dto.AcademicAiToolResult;
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.dto.LlmToolCall;
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.grounding.*;
+import com.smartAiUniversityAssistant.seniorproject.feature.assistant.service.AcademicAiToolNames;
 import java.time.Clock;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -20,6 +21,11 @@ import org.springframework.stereotype.Service;
  * with nothing verified, an ambiguous course is answered with the backend's candidates, a not-found with the matching
  * "not available" reply, and a request whose only results are empty lists with "no active enrollments". ERROR-only
  * results stay with the model so it can correct its arguments within the existing tool limits.
+ * <p>
+ * Step 15A: search_university_knowledge is knowledge evidence. A search failure (KNOWLEDGE_SEARCH_*) is UNAVAILABLE but
+ * fails closed only when nothing is verified; only a failed database tool always fails closed. A search without result
+ * is answered by the backend ("not found"); with any passage the model phrases the answer and the validator checks it.
+ * The requestedIdentifier of a search is its query, so a course code the student asked about is known to the check.
  */
 @Service
 public class AcademicGroundingServiceImpl implements AcademicGroundingService {
@@ -28,6 +34,10 @@ public class AcademicGroundingServiceImpl implements AcademicGroundingService {
     static final String COURSE_SECTION_NOT_FOUND = "COURSE_SECTION_NOT_FOUND";
     static final String STUDENT_COURSE_ENROLLMENT_NOT_FOUND = "STUDENT_COURSE_ENROLLMENT_NOT_FOUND";
     static final String AI_TOOL_EXECUTION_FAILED = "AI_TOOL_EXECUTION_FAILED";
+    static final String KNOWLEDGE_SEARCH_UNAVAILABLE = "KNOWLEDGE_SEARCH_UNAVAILABLE";
+    static final String KNOWLEDGE_SEARCH_RATE_LIMITED = "KNOWLEDGE_SEARCH_RATE_LIMITED";
+    static final String KNOWLEDGE_SEARCH_NOT_CONFIGURED = "KNOWLEDGE_SEARCH_NOT_CONFIGURED";
+    private static final int MAX_QUERY_IDENTIFIER = 500;
     private static final Pattern CONTROL = Pattern.compile("[\\p{Cntrl}\\p{Zl}\\p{Zp}]");
 
     private final AcademicGroundingPolicy policy;
@@ -52,7 +62,8 @@ public class AcademicGroundingServiceImpl implements AcademicGroundingService {
             status = switch (code) {
                 case ACADEMIC_COURSE_AMBIGUOUS -> AMBIGUOUS;
                 case COURSE_NOT_FOUND, COURSE_SECTION_NOT_FOUND, STUDENT_COURSE_ENROLLMENT_NOT_FOUND -> NOT_FOUND;
-                case AI_TOOL_EXECUTION_FAILED -> UNAVAILABLE;
+                case AI_TOOL_EXECUTION_FAILED, KNOWLEDGE_SEARCH_UNAVAILABLE, KNOWLEDGE_SEARCH_RATE_LIMITED,
+                     KNOWLEDGE_SEARCH_NOT_CONFIGURED -> UNAVAILABLE;
                 default -> ERROR;
             };
             if (status == AMBIGUOUS) data = result.candidates();
@@ -68,9 +79,11 @@ public class AcademicGroundingServiceImpl implements AcademicGroundingService {
             return policy.requiresAcademicEvidence(academicIntent)
                     ? AcademicGroundingDecision.blockUnsupported(responses.missingEvidence())
                     : AcademicGroundingDecision.allow();
-        if (evidence.stream().anyMatch(e -> e.status() == UNAVAILABLE))
+        if (evidence.stream().anyMatch(e -> !isKnowledge(e) && e.status() == UNAVAILABLE))
             return AcademicGroundingDecision.verificationFailed(responses.academicServiceUnavailable());
         if (evidence.stream().anyMatch(e -> e.status() == VERIFIED)) return AcademicGroundingDecision.allow();
+        if (evidence.stream().anyMatch(e -> isKnowledge(e) && e.status() == UNAVAILABLE))
+            return AcademicGroundingDecision.verificationFailed(responses.knowledgeUnavailable());
         Optional<AcademicEvidence> ambiguous = last(evidence, AMBIGUOUS);
         if (ambiguous.isPresent()) {
             List<?> candidates = ambiguous.get().verifiedData() instanceof List<?> list ? list : List.of();
@@ -78,9 +91,20 @@ public class AcademicGroundingServiceImpl implements AcademicGroundingService {
         }
         Optional<AcademicEvidence> notFound = last(evidence, NOT_FOUND);
         if (notFound.isPresent()) return AcademicGroundingDecision.notAvailable(notFoundMessage(notFound.get()));
-        if (evidence.stream().allMatch(e -> e.status() == VERIFIED_EMPTY))
-            return AcademicGroundingDecision.notAvailable(responses.enrollmentUnavailable());
+        // A search with invalid arguments is ignored here, so the model may correct it if nothing else is left.
+        List<AcademicEvidence> considered = evidence.stream().filter(e -> !(isKnowledge(e) && e.status() == ERROR)).toList();
+        if (!considered.isEmpty() && considered.stream().allMatch(e -> e.status() == VERIFIED_EMPTY)) {
+            boolean knowledge = considered.stream().anyMatch(AcademicGroundingServiceImpl::isKnowledge);
+            boolean database = considered.stream().anyMatch(e -> !isKnowledge(e));
+            if (knowledge && database)
+                return AcademicGroundingDecision.notAvailable(responses.enrollmentUnavailable() + "\n\n" + responses.knowledgeNotFound());
+            return AcademicGroundingDecision.notAvailable(knowledge ? responses.knowledgeNotFound() : responses.enrollmentUnavailable());
+        }
         return AcademicGroundingDecision.allow();
+    }
+
+    static boolean isKnowledge(AcademicEvidence e) {
+        return AcademicAiToolNames.SEARCH_UNIVERSITY_KNOWLEDGE.equals(e.toolName());
     }
 
     private String notFoundMessage(AcademicEvidence e) {
@@ -99,6 +123,11 @@ public class AcademicGroundingServiceImpl implements AcademicGroundingService {
     // The identifier the backend queried with; it already passed the executor's and the query service's validation.
     private static String identifier(LlmToolCall call) {
         if (call == null || call.arguments() == null) return null;
+        if (AcademicAiToolNames.SEARCH_UNIVERSITY_KNOWLEDGE.equals(call.name())) {
+            if (!(call.arguments().get("query") instanceof String q)) return null;
+            String clean = CONTROL.matcher(q).replaceAll(" ").strip();
+            return clean.isEmpty() ? null : clean.length() > MAX_QUERY_IDENTIFIER ? clean.substring(0, MAX_QUERY_IDENTIFIER) : clean;
+        }
         Object value = call.arguments().containsKey("courseIdentifier") ? call.arguments().get("courseIdentifier")
                 : call.arguments().get("courseSectionId");
         if (value instanceof Number n) return String.valueOf(n.longValue());

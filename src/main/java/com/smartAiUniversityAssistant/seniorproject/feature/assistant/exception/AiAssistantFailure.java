@@ -52,4 +52,10 @@ public class AiAssistantFailure extends RuntimeException {
         return new AiAssistantFailure(503, "ASSISTANT_CONTEXT_UNAVAILABLE",
                 "The conversation could not be loaded or saved right now. Please try again.");
     }
+
+    // Step 17: PostgreSQL could not store or restore the turn. Nothing of the turn is kept in the history.
+    public static AiAssistantFailure historyUnavailable() {
+        return new AiAssistantFailure(503, "ASSISTANT_HISTORY_UNAVAILABLE",
+                "The conversation history could not be loaded or saved right now. Please try again.");
+    }
 }

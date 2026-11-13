@@ -1,5 +1,6 @@
 package com.smartAiUniversityAssistant.seniorproject.feature.authentication;
 
+import com.smartAiUniversityAssistant.seniorproject.MigrationVersions;
 import com.smartAiUniversityAssistant.seniorproject.IntegrationSupport;
 import com.smartAiUniversityAssistant.seniorproject.feature.authentication.dto.*;
 import com.smartAiUniversityAssistant.seniorproject.feature.authentication.service.*;
@@ -48,6 +49,9 @@ class AuthenticationIntegrationTests extends IntegrationSupport {
          db.update("DELETE FROM app_user_roles"); db.update("DELETE FROM appuser_credentials");
          db.update("UPDATE app_users SET department_id=NULL");
          db.update("DELETE FROM enrollments");
+         // Timetable meetings reference sections and campus rooms; other classes may leave some behind.
+         db.update("DELETE FROM timetable_meeting_exceptions");
+         db.update("DELETE FROM course_section_meetings");
          db.update("DELETE FROM course_sections");
          db.update("DELETE FROM courses");
          db.update("DELETE FROM lectures");
@@ -347,7 +351,7 @@ class AuthenticationIntegrationTests extends IntegrationSupport {
     @Test void migrationHistoryAndSchemaStayValid() {
         assertThat(db.queryForList("SELECT checksum FROM flyway_schema_history WHERE version IN ('1','2','3','4','5','6') ORDER BY installed_rank",Integer.class))
                 .containsExactly(-1609524967,-715303110,750119622,111998084,-1083275929,347487127);
-        assertThat(db.queryForObject("SELECT count(*) FROM flyway_schema_history",Integer.class)).isEqualTo(47);
+        assertThat(db.queryForObject("SELECT count(*) FROM flyway_schema_history",Integer.class)).isEqualTo(MigrationVersions.count());
         assertThat(db.queryForObject("SELECT description FROM flyway_schema_history WHERE version='7'",String.class))
                 .isEqualTo("seed super admin account");
         assertThat(db.queryForObject("SELECT description FROM flyway_schema_history WHERE version='8'",String.class))
@@ -388,7 +392,7 @@ class AuthenticationIntegrationTests extends IntegrationSupport {
                 .isEqualTo("create academic document processing");
         assertThat(db.queryForObject("SELECT is_nullable FROM information_schema.columns WHERE table_name='semesters' AND column_name='academic_year'",String.class))
                 .isEqualTo("NO");
-        assertThat(db.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_schema='public'",Integer.class)).isEqualTo(43);
+        assertThat(db.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_schema='public'",Integer.class)).isEqualTo(47);  // Step 17 added assistant_conversations and assistant_messages
         assertThat(db.queryForObject("SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('app_roles','app_users','app_user_roles','appuser_credentials')",Integer.class)).isEqualTo(34);
     }
 }
