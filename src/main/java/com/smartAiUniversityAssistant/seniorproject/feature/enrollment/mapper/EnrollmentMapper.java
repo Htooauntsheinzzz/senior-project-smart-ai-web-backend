@@ -22,7 +22,6 @@ public class EnrollmentMapper {
                 section.getId(), section.getSectionNumber(),
                 semester.getId(), semester.getSemesterNameEn(), semester.getSemesterNameTh(),
                 lecture.getId(), lecture.getLectureNameEn(), lecture.getLectureNameTh(),
-                section.getRoom(), section.getSchedule(),
                 section.getCapacity(), enrolledCount, enrolledCount >= section.getCapacity(),
                 e.getEnrollmentDate(), e.getStatus().name(),
                 e.getCreatedBy(), instant(e.getCreatedAt()), e.getUpdatedBy(), instant(e.getUpdatedAt()));

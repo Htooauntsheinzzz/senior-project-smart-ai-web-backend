@@ -19,7 +19,8 @@ public class Enrollment {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30) private EnrollmentStatus status;
     @Column(name = "is_deleted", nullable = false) private boolean deleted;
-    @Column(name = "created_by", nullable = false) private Long createdBy;
+    // NULL when the Student enrolled themselves: created_by references app_users only (spec file 43).
+    @Column(name = "created_by") private Long createdBy;
     @Column(name = "created_at", nullable = false) private LocalDateTime createdAt;
     @Column(name = "updated_by") private Long updatedBy;
     @Column(name = "updated_at") private LocalDateTime updatedAt;

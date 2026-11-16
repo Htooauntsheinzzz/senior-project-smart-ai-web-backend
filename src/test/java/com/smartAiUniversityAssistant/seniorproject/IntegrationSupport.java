@@ -11,14 +11,22 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.lifecycle.Startables;
+import org.testcontainers.utility.DockerImageName;
 
 @Import(IntegrationSupport.TimeConfiguration.class)
 public abstract class IntegrationSupport {
-    protected static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine");
+    /** PostgreSQL 17 with pgvector (spec file 45, section 6.4). Test databases are fresh, so the Debian base does not matter. */
+    protected static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(
+            DockerImageName.parse("pgvector/pgvector:pg17").asCompatibleSubstituteFor("postgres"))
+            // Every cached Spring test context keeps its own connection pool; the default limit of 100 was reached once the
+            // Step 15/16 test classes added contexts (D78).
+            .withCommand("postgres", "-c", "fsync=off", "-c", "max_connections=300");
     protected static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7.4-alpine")
             .withExposedPorts(6379).withCommand("redis-server","--requirepass","test-only-redis-password","--maxmemory-policy","noeviction");
     private static final Path PRIVATE_KEY;
     private static final Path PUBLIC_KEY;
+    /** Controlled temporary storage for knowledge document uploads. */
+    protected static final Path KNOWLEDGE_STORAGE;
     static {
         try {
             var directory=Files.createTempDirectory("susa-auth-test-keys-");
@@ -28,6 +36,7 @@ public abstract class IntegrationSupport {
             PRIVATE_KEY=directory.resolve("private.pem"); PUBLIC_KEY=directory.resolve("public.pem");
             writeKey(PRIVATE_KEY,"PRIVATE KEY",pair.getPrivate().getEncoded());
             writeKey(PUBLIC_KEY,"PUBLIC KEY",pair.getPublic().getEncoded());
+            KNOWLEDGE_STORAGE=Files.createTempDirectory("susa-knowledge-storage-");
             Startables.deepStart(POSTGRES,REDIS).join();
         } catch (Exception e) { throw new ExceptionInInitializerError(e); }
     }
@@ -51,6 +60,13 @@ public abstract class IntegrationSupport {
         r.add("app.security.jwt.public-key-path",() -> PUBLIC_KEY.toString());
         r.add("app.auth.password.bcrypt-strength",() -> "4");
         r.add("app.auth.session.key-prefix",() -> "susa:test:auth");
+        r.add("app.knowledge.storage.root",() -> KNOWLEDGE_STORAGE.toString());
+        // No background ingestion worker in any test; tests call DocumentIngestionService.runOnce() themselves.
+        r.add("app.knowledge.ingestion.scheduler-enabled",() -> "false");
+        // No embedding model from the developer's shell: the assistant's knowledge search is not active (spec file 53, 5.2).
+        r.add("app.knowledge.embedding.model",() -> "");
+        // Step 16A (spec file 56, 5.2): the progress tool is off unless a test class switches it on with a @Primary bean.
+        r.add("app.ai.progress.enabled",() -> "false");
     }
     @TestConfiguration(proxyBeanMethods=false) public static class TimeConfiguration {
         @Bean @Primary MutableClock testClock() { return new MutableClock(); }

@@ -5,6 +5,7 @@ import com.smartAiUniversityAssistant.seniorproject.feature.course.exception.Cou
 import com.smartAiUniversityAssistant.seniorproject.feature.course.repository.CourseRepository;
 import com.smartAiUniversityAssistant.seniorproject.feature.coursesection.dto.*;
 import com.smartAiUniversityAssistant.seniorproject.feature.coursesection.entity.CourseSection;
+import com.smartAiUniversityAssistant.seniorproject.feature.coursesection.entity.CourseSectionMeeting;
 import com.smartAiUniversityAssistant.seniorproject.feature.coursesection.enums.CourseSectionStatus;
 import com.smartAiUniversityAssistant.seniorproject.feature.coursesection.exception.*;
 import com.smartAiUniversityAssistant.seniorproject.feature.coursesection.mapper.CourseSectionMapper;
@@ -12,12 +13,16 @@ import com.smartAiUniversityAssistant.seniorproject.feature.coursesection.reposi
 import com.smartAiUniversityAssistant.seniorproject.feature.coursesection.service.CourseSectionService;
 import com.smartAiUniversityAssistant.seniorproject.feature.enrollment.enums.EnrollmentStatus;
 import com.smartAiUniversityAssistant.seniorproject.feature.enrollment.repository.EnrollmentRepository;
+import com.smartAiUniversityAssistant.seniorproject.feature.enrollment.service.EnrollmentWindowService;
 import com.smartAiUniversityAssistant.seniorproject.feature.lecture.entity.Lecture;
 import com.smartAiUniversityAssistant.seniorproject.feature.lecture.exception.LectureNotFoundException;
 import com.smartAiUniversityAssistant.seniorproject.feature.lecture.repository.LectureRepository;
 import com.smartAiUniversityAssistant.seniorproject.feature.semester.entity.Semester;
 import com.smartAiUniversityAssistant.seniorproject.feature.semester.exception.SemesterNotFoundException;
 import com.smartAiUniversityAssistant.seniorproject.feature.semester.repository.SemesterRepository;
+import com.smartAiUniversityAssistant.seniorproject.feature.timetable.entity.AcademicTerm;
+import com.smartAiUniversityAssistant.seniorproject.feature.timetable.enums.TimetableMeetingStatus;
+import com.smartAiUniversityAssistant.seniorproject.feature.timetable.repository.AcademicTermRepository;
 import com.smartAiUniversityAssistant.seniorproject.security.*;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.criteria.Predicate;
@@ -37,18 +42,23 @@ public class CourseSectionServiceImpl implements CourseSectionService {
     private final LectureRepository lectures;
     private final SemesterRepository semesters;
     private final EnrollmentRepository enrollments;
+    private final AcademicTermRepository terms;
+    private final EnrollmentWindowService windows;
     private final CourseSectionMapper mapper;
     private final Clock clock;
     private final EntityManager entityManager;
 
     public CourseSectionServiceImpl(CourseSectionRepository sections, CourseRepository courses,
             LectureRepository lectures, SemesterRepository semesters, EnrollmentRepository enrollments,
-            CourseSectionMapper mapper, Clock clock, EntityManager entityManager) {
+            AcademicTermRepository terms, EnrollmentWindowService windows, CourseSectionMapper mapper, Clock clock,
+            EntityManager entityManager) {
         this.sections = sections;
         this.courses = courses;
         this.lectures = lectures;
         this.semesters = semesters;
         this.enrollments = enrollments;
+        this.terms = terms;
+        this.windows = windows;
         this.mapper = mapper;
         this.clock = clock;
         this.entityManager = entityManager;
@@ -62,6 +72,7 @@ public class CourseSectionServiceImpl implements CourseSectionService {
         Lecture lecture = selectedLecture(request.lectureId());
         requireAcademicMatch(lecture, course);
         Semester semester = selectedSemester(request.semesterId());
+        AcademicTerm term = selectedTerm(request.academicTermId(), semester);
         String status = CourseSectionStatus.fromValue(request.status()).getValue();
         Integer capacity = capacity(request.capacity(), course);
         duplicates(0L, course.getId(), request.sectionNumber(), semester.getId());
@@ -70,9 +81,8 @@ public class CourseSectionServiceImpl implements CourseSectionService {
         section.setSectionNumber(request.sectionNumber());
         section.setCapacity(capacity);
         section.setLecture(lecture);
-        section.setRoom(request.room());
-        section.setSchedule(request.schedule());
         section.setSemester(semester);
+        section.setAcademicTerm(term);
         section.setStatus(status);
         section.setDeleted(false);
         section.setCreatedBy(actor.userId());
@@ -92,7 +102,7 @@ public class CourseSectionServiceImpl implements CourseSectionService {
         if (!page.isEmpty())
             enrollments.countOccupiedSeats(page.getContent().stream().map(CourseSection::getId).toList(),
                     EnrollmentStatus.SEAT_HOLDING).forEach(row -> enrolled.put(row.getSectionId(), row.getTotal()));
-        return mapper.page(page, query, enrolled);
+        return mapper.page(page, query, enrolled, windows.windows(page.getContent().stream().map(CourseSection::getId).toList()));
     }
 
     @Override @Transactional(readOnly = true, timeout = 15)
@@ -113,6 +123,7 @@ public class CourseSectionServiceImpl implements CourseSectionService {
         Lecture lecture = selectedLecture(request.lectureId());
         requireAcademicMatch(lecture, course);
         Semester semester = selectedSemester(request.semesterId());
+        AcademicTerm term = selectedTerm(request.academicTermId(), semester);
         String status = CourseSectionStatus.fromValue(request.status()).getValue();
         duplicates(id, course.getId(), request.sectionNumber(), semester.getId());
         // The Section row lock blocks concurrent enrollments, so this count is stable until commit.
@@ -123,9 +134,8 @@ public class CourseSectionServiceImpl implements CourseSectionService {
         section.setSectionNumber(request.sectionNumber());
         section.setCapacity(request.capacity());
         section.setLecture(lecture);
-        section.setRoom(request.room());
-        section.setSchedule(request.schedule());
         section.setSemester(semester);
+        section.setAcademicTerm(term);
         section.setStatus(status);
         section.setUpdatedBy(actor.userId());
         section.setUpdatedAt(now());
@@ -197,6 +207,16 @@ public class CourseSectionServiceImpl implements CourseSectionService {
         return semester;
     }
 
+    // The term is the year-specific offering of the section's own semester (spec file 42, Part C), so they must agree.
+    private AcademicTerm selectedTerm(Long id, Semester semester) {
+        if (id == null) return null;
+        AcademicTerm term = terms.findByIdAndDeletedFalse(id).orElseThrow(() ->
+                new CourseSectionFailure(400, "ACADEMIC_TERM_NOT_FOUND", "The academic term does not exist or is deleted."));
+        if (!term.getSemester().getId().equals(semester.getId()))
+            throw new CourseSectionFailure(400, "ACADEMIC_TERM_SEMESTER_MISMATCH", "The academic term belongs to a different semester than semesterId.");
+        return term;
+    }
+
     private Integer capacity(Integer requested, Course course) {
         // An omitted capacity falls back to the course's per-section default.
         Integer capacity = requested != null ? requested : course.getMaximumStudentsPerSection();
@@ -221,6 +241,14 @@ public class CourseSectionServiceImpl implements CourseSectionService {
             if (query.lectureId() != null)
                 predicates.add(cb.equal(root.get("lecture").get("id"), query.lectureId()));
             if (query.status() != null) predicates.add(cb.equal(root.get("status"), query.status()));
+            if (query.scheduled() != null) {
+                // On the timetable = at least one live PUBLISHED meeting (spec file 44).
+                var published = criteria.subquery(Long.class);
+                var meeting = published.from(CourseSectionMeeting.class);
+                published.select(meeting.get("id")).where(cb.equal(meeting.get("courseSection"), root),
+                        cb.isFalse(meeting.get("deleted")), cb.equal(meeting.get("status"), TimetableMeetingStatus.PUBLISHED));
+                predicates.add(query.scheduled() ? cb.exists(published) : cb.not(cb.exists(published)));
+            }
             if (query.search() != null) {
                 String literal = query.search().toLowerCase(Locale.ROOT).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
                 predicates.add(cb.or(cb.like(cb.lower(root.get("course").get("courseCode")), "%" + literal + "%", '\\'),
@@ -228,8 +256,7 @@ public class CourseSectionServiceImpl implements CourseSectionService {
                         cb.like(cb.lower(root.get("sectionNumber")), "%" + literal + "%", '\\'),
                         cb.like(cb.lower(root.get("lecture").get("lectureNameEn")), "%" + literal + "%", '\\'),
                         cb.like(cb.lower(root.get("lecture").get("lectureNameTh")), "%" + literal + "%", '\\'),
-                        cb.like(cb.lower(root.get("lecture").get("lectureNickname")), "%" + literal + "%", '\\'),
-                        cb.like(cb.lower(root.get("room")), "%" + literal + "%", '\\')));
+                        cb.like(cb.lower(root.get("lecture").get("lectureNickname")), "%" + literal + "%", '\\')));
             }
             return cb.and(predicates.toArray(Predicate[]::new));
         };

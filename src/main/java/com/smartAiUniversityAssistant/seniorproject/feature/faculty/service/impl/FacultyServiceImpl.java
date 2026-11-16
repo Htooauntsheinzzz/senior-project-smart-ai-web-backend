@@ -39,7 +39,7 @@ public class FacultyServiceImpl implements FacultyService {
     @Transactional(timeout = 15)
     public FacultyResponse create(AuthenticatedUser actor, FacultyCreateRequest request) {
         requireFullSession(actor);
-        if (faculties.existsByFacultyCode(request.facultyCode())) throw new FacultyCodeAlreadyExistsException();
+        if (faculties.existsByFacultyCodeIgnoreCase(request.facultyCode())) throw new FacultyCodeAlreadyExistsException();
         if (faculties.existsByFacultyNameEn(request.facultyNameEn())) throw new FacultyNameAlreadyExistsException();
         var faculty = new Faculty();
         faculty.setFacultyCode(request.facultyCode());
@@ -84,7 +84,7 @@ public class FacultyServiceImpl implements FacultyService {
         requirePositiveId(id);
         Faculty faculty = faculties.findByIdForUpdate(id).orElseThrow(FacultyNotFoundException::new);
         if (faculty.isDeleted()) throw new FacultyNotFoundException();
-        if (faculties.existsByFacultyCodeAndIdNot(request.facultyCode(), id))
+        if (faculties.existsByFacultyCodeIgnoreCaseAndIdNot(request.facultyCode(), id))
             throw new FacultyCodeAlreadyExistsException();
         if (faculties.existsByFacultyNameEnAndIdNot(request.facultyNameEn(), id))
             throw new FacultyNameAlreadyExistsException();

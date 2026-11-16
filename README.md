@@ -515,6 +515,31 @@ Spring Boot loads `.env` automatically from the working directory. Stop the
 containerized backend first (`docker compose stop backend`) if it uses the same
 HTTP port. Environment variables override values from `.env`.
 
+### PostgreSQL with pgvector (Step 14)
+
+From Flyway V48 on, PostgreSQL needs the `pgvector` extension (knowledge chunk embeddings, spec file 45).
+The `postgres` service uses the ready-made `pgvector/pgvector:pg17` image (decision D74; the same image the
+tests use). It stores its data in the named volume `postgres_data_pgvector`. The image is Debian/glibc while the
+old `postgres_data` volume was created by `postgres:17-alpine` (musl), so it was not reused: the data was moved
+with `pg_dump` / `pg_restore` and the old volume was then removed. The earlier Alpine build
+(`docker/postgres/Dockerfile`, D65) was deleted. Both were removed on 2026-11-10 after the restore was
+verified; the backup files stay in `/Users/htooauntshein/Shein_Workspace/smart-ai-db-backend` (outside git).
+
+Switching an existing database (take the backup while the old container still runs):
+
+```sh
+docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > backup.dump
+docker compose stop backend postgres
+docker compose up -d --wait postgres
+cat backup.dump | docker compose exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-privileges'
+docker compose exec postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT max(version::int) FROM flyway_schema_history;" -c "SELECT name, default_version FROM pg_available_extensions WHERE name = '"'"'vector'"'"';"'
+docker compose up -d --build backend
+```
+
+The `pg_available_extensions` query must return one row. On start the backend's Flyway applies the pending
+migrations (V48 to V51). Keep the dump out of git. A managed database whose application role cannot create
+extensions needs an administrator to run `CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;` once.
+
 ## Verify infrastructure and run tests
 
 ```sh

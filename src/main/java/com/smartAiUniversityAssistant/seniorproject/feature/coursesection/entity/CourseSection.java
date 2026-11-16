@@ -3,6 +3,7 @@ package com.smartAiUniversityAssistant.seniorproject.feature.coursesection.entit
 import com.smartAiUniversityAssistant.seniorproject.feature.course.entity.Course;
 import com.smartAiUniversityAssistant.seniorproject.feature.lecture.entity.Lecture;
 import com.smartAiUniversityAssistant.seniorproject.feature.semester.entity.Semester;
+import com.smartAiUniversityAssistant.seniorproject.feature.timetable.entity.AcademicTerm;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import lombok.Getter;
@@ -17,10 +18,11 @@ public class CourseSection {
     @Column(name = "capacity", nullable = false) private Integer capacity;
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "lecture_id", nullable = false) private Lecture lecture;
-    @Column(name = "room", length = 100) private String room;
-    @Column(name = "schedule", length = 255) private String schedule;
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "semester_id", nullable = false) private Semester semester;
+    // Nullable until every section is reconciled with a verified term (spec file 42, section 10).
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "academic_term_id") private AcademicTerm academicTerm;
     @Column(name = "status", nullable = false, length = 30) private String status;
     @Column(name = "is_deleted", nullable = false) private boolean deleted;
     @Column(name = "created_by", nullable = false) private Long createdBy;

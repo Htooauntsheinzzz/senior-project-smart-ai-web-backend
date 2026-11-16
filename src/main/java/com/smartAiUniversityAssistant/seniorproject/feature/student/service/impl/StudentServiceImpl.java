@@ -54,7 +54,7 @@ public class StudentServiceImpl implements StudentService {
             throw new StudentEmailAlreadyExistsException();
         var student = new Student();
         apply(student, request.studentCode(), request.universityEmail(), request.firstName(), request.lastName(),
-                request.phoneNumber(), request.dateOfBirth(), placement, request.academicYear(), request.enrollmentYear());
+                request.phoneNumber(), request.dateOfBirth(), placement, request.academicYear(), request.enrollmentYear(), request.studyYear());
         student.setAccountStatus(status.name());
         student.setDeleted(false);
         student.setCreatedBy(actor.userId());
@@ -115,7 +115,7 @@ public class StudentServiceImpl implements StudentService {
         if (students.existsByUniversityEmailIgnoreCaseAndIdNot(request.universityEmail(), id))
             throw new StudentEmailAlreadyExistsException();
         apply(student, request.studentCode(), request.universityEmail(), request.firstName(), request.lastName(),
-                request.phoneNumber(), request.dateOfBirth(), placement, request.academicYear(), request.enrollmentYear());
+                request.phoneNumber(), request.dateOfBirth(), placement, request.academicYear(), request.enrollmentYear(), request.studyYear());
         student.setAccountStatus(requested.name());
         student.setUpdatedBy(actor.userId());
         student.setUpdatedAt(now());
@@ -159,7 +159,7 @@ public class StudentServiceImpl implements StudentService {
 
     private void apply(Student student, String code, String email, String firstName, String lastName, String phone,
             LocalDate dateOfBirth, StudentAcademicValidator.AcademicPlacement placement,
-            Integer academicYear, Integer enrollmentYear) {
+            Integer academicYear, Integer enrollmentYear, Integer studyYear) {
         student.setStudentCode(code);
         student.setUniversityEmail(email);
         student.setFirstName(firstName);
@@ -172,6 +172,7 @@ public class StudentServiceImpl implements StudentService {
         student.setSemester(placement.semester());
         student.setAcademicYear(academicYear == null ? null : academicYear.shortValue());
         student.setEnrollmentYear(enrollmentYear == null ? null : enrollmentYear.shortValue());
+        student.setStudyYear(studyYear == null ? null : studyYear.shortValue());
     }
 
     private Specification<Student> specification(StudentListQuery query) {

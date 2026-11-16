@@ -9,6 +9,8 @@ RUN sh ./mvnw -B -DskipTests package
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 RUN groupadd --system --gid 999 spring && useradd --system --uid 999 --gid spring spring
+# Mount point for the knowledge document volume; a new named volume inherits this owner and mode.
+RUN mkdir -p /app/storage/academic-documents && chown -R spring:spring /app/storage && chmod 700 /app/storage/academic-documents
 COPY --from=build --chown=spring:spring /app/target/seniorproject-0.0.1-SNAPSHOT.jar app.jar
 USER spring:spring
 EXPOSE 8080

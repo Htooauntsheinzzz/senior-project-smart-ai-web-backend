@@ -16,6 +16,7 @@ public record StudentUpdateRequest(
         @Positive Long semesterId,
         @Min(1900) @Max(9999) Integer academicYear,
         @Min(1900) @Max(9999) Integer enrollmentYear,
+        @Min(1) @Max(10) Integer studyYear,
         @NotBlank String accountStatus) {
     public StudentUpdateRequest {
         studentCode = studentCode == null ? null : studentCode.trim();

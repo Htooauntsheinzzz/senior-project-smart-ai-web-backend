@@ -9,9 +9,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface FacultyRepository extends JpaRepository<Faculty, Long>, JpaSpecificationExecutor<Faculty> {
     Optional<Faculty> findByIdAndDeletedFalse(Long id);
-    boolean existsByFacultyCode(String facultyCode);
+    boolean existsByFacultyCodeIgnoreCase(String facultyCode);
     boolean existsByFacultyNameEn(String facultyNameEn);
-    boolean existsByFacultyCodeAndIdNot(String facultyCode, Long id);
+    boolean existsByFacultyCodeIgnoreCaseAndIdNot(String facultyCode, Long id);
     boolean existsByFacultyNameEnAndIdNot(String facultyNameEn, Long id);
     long countByDeletedFalse();
     long countByActiveTrueAndDeletedFalse();

@@ -1,0 +1,31 @@
+{
+  "datasetVersion": "1.0",
+  "documents": {
+    "regulations": "Sample Academic Regulations 2026",
+    "curriculum": "Sample B.Sc. Computer Science Curriculum 2026"
+  },
+  "minimumCases": {
+    "GRADUATION": 4,
+    "ELECTIVES": 4,
+    "INTERNSHIP": 3,
+    "PROGRAM_REQUIREMENTS": 4,
+    "PRECEDENCE": 2,
+    "OTHER_AUDIENCE": 4,
+    "NOT_FOUND": 3,
+    "SEARCH_MISSING": 4,
+    "FAULTY_ANSWER": 4,
+    "PERSONAL_MIX": 2,
+    "LANGUAGE": 3
+  },
+  "minimumTotal": 40,
+  "otherProgramMarkers": [
+    "Sample B.Sc. Computer Science Curriculum 2026",
+    "132",
+    "CSC486"
+  ],
+  "fixtureValues": [
+    "CS301",
+    "CSC452",
+    "Computer Science"
+  ]
+}

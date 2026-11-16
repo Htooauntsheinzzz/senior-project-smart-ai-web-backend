@@ -25,7 +25,7 @@ public class StudentMapper {
                 get(d, Department::getId), get(d, Department::getDepartmentCode), get(d, Department::getDepartmentName),
                 get(p, Program::getId), get(p, Program::getProgramCode), get(p, Program::getProgramName),
                 get(m, Semester::getId), get(m, Semester::getSemesterNameTh), get(m, Semester::getSemesterNameEn),
-                integer(s.getAcademicYear()), integer(s.getEnrollmentYear()),
+                integer(s.getAcademicYear()), integer(s.getEnrollmentYear()), integer(s.getStudyYear()),
                 s.getAccountStatus(), credential != null && credential.isForcePasswordChange(),
                 s.getCreatedBy(), instant(s.getCreatedAt()), s.getUpdatedBy(), instant(s.getUpdatedAt()));
     }
@@ -41,7 +41,7 @@ public class StudentMapper {
                 get(d, Department::getId), get(d, Department::getDepartmentCode), get(d, Department::getDepartmentName),
                 get(p, Program::getId), get(p, Program::getProgramCode), get(p, Program::getProgramName),
                 get(m, Semester::getId), get(m, Semester::getSemesterNameEn),
-                integer(s.getAcademicYear()), integer(s.getEnrollmentYear()),
+                integer(s.getAcademicYear()), integer(s.getEnrollmentYear()), integer(s.getStudyYear()),
                 s.getAccountStatus(), instant(s.getCreatedAt()), instant(s.getUpdatedAt()));
     }
 

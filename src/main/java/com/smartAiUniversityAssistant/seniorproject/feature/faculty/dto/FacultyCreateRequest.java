@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.Nulls;
 import jakarta.validation.constraints.*;
 
 public final class FacultyCreateRequest {
-    @NotBlank @Size(max = 30) @Pattern(regexp = "^[A-Z0-9-]+$") private String facultyCode;
+    @NotBlank @Size(max = 30) @Pattern(regexp = "^[A-Za-z0-9 -]+$") private String facultyCode;
     @NotBlank @Size(max = 255) private String facultyNameEn;
     @Size(max = 255) private String facultyNameTh;
     @NotNull private Boolean isActive = true;

@@ -10,9 +10,9 @@ import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
 public interface CourseSectionRepository extends JpaRepository<CourseSection, Long>, JpaSpecificationExecutor<CourseSection> {
-    @EntityGraph(attributePaths = {"course", "lecture", "semester"})
+    @EntityGraph(attributePaths = {"course", "lecture", "semester", "academicTerm"})
     Optional<CourseSection> findByIdAndDeletedFalse(Long id);
-    @Override @EntityGraph(attributePaths = {"course", "lecture", "semester"})
+    @Override @EntityGraph(attributePaths = {"course", "lecture", "semester", "academicTerm"})
     Page<CourseSection> findAll(Specification<CourseSection> specification, Pageable pageable);
     boolean existsByCourseIdAndSectionNumberAndSemesterIdAndIdNot(Long courseId, String sectionNumber, Long semesterId,
             Long id);
@@ -24,6 +24,15 @@ public interface CourseSectionRepository extends JpaRepository<CourseSection, Lo
     @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))
     @Query("select s from CourseSection s where s.id = :id")
     Optional<CourseSection> findByIdForUpdate(@Param("id") Long id);
+
+    // Sections a Student may request from the mobile application: open sections of live, active courses in one semester.
+    @Query("""
+            select s from CourseSection s join fetch s.course c join fetch s.lecture join fetch s.semester sem
+            where sem.id = :semesterId and s.deleted = false and s.status = 'ACTIVE'
+              and c.deleted = false and c.active = true
+            order by c.courseCode asc, s.sectionNumber asc, s.id asc
+            """)
+    List<CourseSection> findOpenForSelfEnrollment(@Param("semesterId") Long semesterId);
 
     interface CourseCount {
         Long getCourseId();

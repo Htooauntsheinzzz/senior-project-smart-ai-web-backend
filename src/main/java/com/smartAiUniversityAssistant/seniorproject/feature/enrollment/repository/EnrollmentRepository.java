@@ -19,6 +19,9 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long>, J
     // Includes soft-deleted rows: UNIQUE(student_id, course_section_id) still reserves the pair.
     boolean existsByStudentIdAndCourseSectionIdAndIdNot(Long studentId, Long courseSectionId, Long id);
 
+    // Includes soft-deleted rows for the same reason; self-enrollment reuses the row instead of inserting a second one.
+    Optional<Enrollment> findByStudentIdAndCourseSectionId(Long studentId, Long courseSectionId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))
     @Query("select e from Enrollment e where e.id = :id")
@@ -38,6 +41,21 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long>, J
     long countConflictingEnrollments(@Param("studentId") Long studentId, @Param("courseId") Long courseId,
             @Param("semesterId") Long semesterId, @Param("statuses") Collection<EnrollmentStatus> statuses,
             @Param("excludeId") Long excludeId);
+
+    // Student academic views: one query fetches Section, Course, Semester and Lecturer for every row.
+    // Enrollments in a soft-deleted Section or Course are hidden, like countOccupiedSeatsInLiveSections.
+    @Query("""
+            select e from Enrollment e
+            join fetch e.courseSection cs join fetch cs.course c join fetch cs.semester sem join fetch cs.lecture l
+            where e.student.id = :studentId and e.status in :statuses and e.deleted = false
+              and cs.deleted = false and c.deleted = false
+            order by sem.academicYear desc, sem.id desc, c.courseCode asc, cs.sectionNumber asc, e.id asc
+            """)
+    List<Enrollment> findStudentAcademicEnrollments(@Param("studentId") Long studentId,
+            @Param("statuses") Collection<EnrollmentStatus> statuses);
+
+    @Query("select count(r) > 0 from StudentCourseResult r where r.enrollment.id = :id")
+    boolean hasCourseResult(@Param("id") Long id);
 
     interface StatusCount {
         EnrollmentStatus getStatus();

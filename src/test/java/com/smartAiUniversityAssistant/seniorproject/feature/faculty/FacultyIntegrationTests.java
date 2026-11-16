@@ -54,6 +54,9 @@ class FacultyIntegrationTests extends IntegrationSupport {
         });
         db.update("UPDATE app_users SET department_id=NULL");
         db.update("DELETE FROM enrollments");
+        // Timetable meetings reference sections and campus rooms; other classes may leave some behind.
+        db.update("DELETE FROM timetable_meeting_exceptions");
+        db.update("DELETE FROM course_section_meetings");
         db.update("DELETE FROM course_sections");
         db.update("DELETE FROM courses");
         db.update("DELETE FROM lectures");
@@ -117,9 +120,9 @@ class FacultyIntegrationTests extends IntegrationSupport {
         Map<String, Object> missingCode = new LinkedHashMap<>(valid);
         missingCode.remove("facultyCode");
         postJson(FACULTIES, missingCode).andExpect(status().isBadRequest());
-        Map<String, Object> lowercase = new LinkedHashMap<>(valid);
-        lowercase.put("facultyCode", "fac-it");
-        postJson(FACULTIES, lowercase).andExpect(status().isBadRequest());
+        Map<String, Object> underscore = new LinkedHashMap<>(valid);
+        underscore.put("facultyCode", "FAC_IT");
+        postJson(FACULTIES, underscore).andExpect(status().isBadRequest());
         Map<String, Object> tooLong = new LinkedHashMap<>(valid);
         tooLong.put("facultyCode", "F".repeat(31));
         postJson(FACULTIES, tooLong).andExpect(status().isBadRequest());
@@ -138,6 +141,11 @@ class FacultyIntegrationTests extends IntegrationSupport {
                 .andExpect(status().isConflict()).andExpect(jsonPath("code").value("FACULTY_NAME_ALREADY_EXISTS"));
         postJson(FACULTIES, validCreate("FAC-IT", "Another Faculty Name"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("code").value("FACULTY_CODE_ALREADY_EXISTS"));
+        postJson(FACULTIES, validCreate("fac-it", "Another Faculty Name"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("code").value("FACULTY_CODE_ALREADY_EXISTS"));
+        postJson(FACULTIES, validCreate("Engineering -Technology", "Faculty of Engineering Technology"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("facultyCode").value("Engineering -Technology"));
+        db.update("DELETE FROM faculties WHERE faculty_code='Engineering -Technology'");
 
         db.update("UPDATE faculties SET is_deleted=TRUE WHERE faculty_code='FAC-IT'");
         postJson(FACULTIES, validCreate("FAC-IT", "Reused Deleted Code"))
