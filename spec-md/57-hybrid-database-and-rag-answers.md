@@ -283,7 +283,7 @@ requirement of a passage.
 H1. Call search_university_knowledge for the requirement, for example "credits required to graduate" or "cooperative
 education requirements". Answer only from the passages and the values below. You do not need to call
 get_my_academic_progress again.
-H2. Name the requirement with its document, then the student's value. When both are credit numbers, you may give the
+H2. State the requirement, then the student's value. When both are credit numbers, you may give the
 difference in words in one sentence, for example "140 credits are required and you have earned 45, so at least 95 more
 credits remain". Write "at least", because some earned credits may not count toward this curriculum. Never write a
 calculation with a hyphen or a minus sign between two numbers.
@@ -301,6 +301,8 @@ student's program, say so and compare with the university-wide value, naming its
 H7. End with one sentence saying that the registrar's office can confirm the student's remaining requirements with an
 official degree audit.
 ```
+
+H2 was changed on 2026-11-13 (decision D85): the requirement is stated without naming its document.
 
 The progress block follows directly after `HYBRID_PROMPT`. It is built by the backend from the map of the `VERIFIED` progress evidence (spec file 56, section 7.1), one line per key in this order, `toPlainString()` for numbers, `null` for a missing value:
 

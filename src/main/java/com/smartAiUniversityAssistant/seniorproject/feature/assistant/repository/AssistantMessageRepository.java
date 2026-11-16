@@ -18,6 +18,12 @@ public interface AssistantMessageRepository extends JpaRepository<AssistantMessa
     List<AssistantMessage> findNewestBefore(@Param("conversationId") UUID conversationId, @Param("beforeId") long beforeId,
             Pageable limit);
 
+    /** Spec file 59: the answer of the chat request with this requestId (both messages of a turn carry it). */
+    @Query("select m from AssistantMessage m where m.conversationId = :conversationId and m.requestId = :requestId "
+            + "and m.role = 'ASSISTANT' order by m.id desc")
+    List<AssistantMessage> findAnswersByRequestId(@Param("conversationId") UUID conversationId, @Param("requestId") String requestId,
+            Pageable limit);
+
     /** Every message of a conversation the Student deletes; the conversation row follows in the same transaction. */
     @Modifying
     @Query("delete from AssistantMessage m where m.conversationId = :conversationId")

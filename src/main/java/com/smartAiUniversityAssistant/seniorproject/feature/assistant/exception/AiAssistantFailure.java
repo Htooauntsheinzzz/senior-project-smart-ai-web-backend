@@ -58,4 +58,12 @@ public class AiAssistantFailure extends RuntimeException {
         return new AiAssistantFailure(503, "ASSISTANT_HISTORY_UNAVAILABLE",
                 "The conversation history could not be loaded or saved right now. Please try again.");
     }
+
+    // Spec file 59: feedback on answers. An answer of another Student's conversation looks like a missing one.
+    public static AiAssistantFailure messageNotFound() {
+        return new AiAssistantFailure(404, "ASSISTANT_MESSAGE_NOT_FOUND", "This answer was not found in the conversation.");
+    }
+    public static AiAssistantFailure feedbackNotFound() {
+        return new AiAssistantFailure(404, "ASSISTANT_FEEDBACK_NOT_FOUND", "The requested feedback does not exist.");
+    }
 }

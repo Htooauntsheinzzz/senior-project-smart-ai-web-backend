@@ -131,6 +131,7 @@ public abstract class IngestionTestSupport extends KnowledgeIntegrationSupport {
         for (String code : students) {
             db.update("DELETE FROM student_credentials WHERE student_id IN (SELECT id FROM students WHERE student_code=?)", code);
             // Step 17: the Student's stored assistant conversations (no cascade, as everywhere in the schema).
+            db.update("DELETE FROM assistant_message_feedback WHERE student_id IN (SELECT id FROM students WHERE student_code=?)", code);
             db.update("DELETE FROM assistant_messages WHERE conversation_id IN (SELECT c.id FROM assistant_conversations c "
                     + "JOIN students s ON s.id=c.student_id WHERE s.student_code=?)", code);
             db.update("DELETE FROM assistant_conversations WHERE student_id IN (SELECT id FROM students WHERE student_code=?)", code);

@@ -115,6 +115,8 @@ public final class AssistantAcademicFixture {
         db.update("DELETE FROM enrollments");
         db.update("DELETE FROM student_credentials");
         // Step 17: stored assistant conversations reference the Student (no cascade, as everywhere in the schema).
+        // Spec file 59: feedback references the rated answer, its conversation, the Student and the reviewing Admin.
+        db.update("DELETE FROM assistant_message_feedback");
         db.update("DELETE FROM assistant_messages");
         db.update("DELETE FROM assistant_conversations");
         db.update("DELETE FROM students");

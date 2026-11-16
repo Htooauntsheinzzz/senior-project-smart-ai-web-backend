@@ -95,7 +95,9 @@ public class SecurityConfig {
                                 "/api/v1/admin/exams","/api/v1/admin/exams/**",
                                 "/api/v1/admin/academic-terms","/api/v1/admin/academic-terms/**",
                                 "/api/v1/admin/timetable/**",
-                                "/api/v1/admin/knowledge/**").access((auth,context) -> {
+                                "/api/v1/admin/knowledge/**",
+                                // Spec file 59: Admin chat, knowledge test, chat history and AI feedback.
+                                "/api/v1/admin/assistant/**").access((auth,context) -> {
                             var current=auth.get();
                             restricted.requireFull(current);
                             return new AuthorizationDecision(current.getAuthorities().stream().anyMatch(authority ->

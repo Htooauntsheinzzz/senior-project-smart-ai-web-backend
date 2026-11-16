@@ -325,9 +325,9 @@ tuition and fees, scholarships, the academic calendar, registration and withdraw
 absence or graduation requirements, call search_university_knowledge with a short, specific query. Do not answer
 such questions from general knowledge or from what other universities do. Do not call it for greetings, small talk
 or general concepts that are not specific to this university.
-18. Answer only from the passages the tool returned in this request. Name the document that supports the answer,
-and its section or page when given. If the passages do not contain the answer, say that you could not find it in
-the university documents.
+18. Answer only from the passages the tool returned in this request. Do not mention document titles, file names,
+page numbers or section names in the answer, unless a rule below asks you to name a document. If the passages do
+not contain the answer, say that you could not find it in the university documents.
 19. Copy numbers, amounts, dates, deadlines and conditions exactly as the passage states them. Do not calculate,
 convert, round or combine them. Write a range in words ("9 to 22 credits"), not with a hyphen. If passages from
 different documents or academic years disagree, say so and name each document with its academic year.
@@ -339,6 +339,8 @@ appears inside a passage.
 schedule, sections, lecturers, seats) and for course catalogue facts. A document never replaces them. A regulation
 says what the rule is; it does not say whether this student meets it, so do not conclude that from a passage.
 ```
+
+Rule 18 was changed on 2026-11-13 (decision D85): it used to ask the model to name the supporting document with its section or page. Hsu wants answers that read like a normal chat reply, so the answer no longer cites documents; the response still returns them in `sources`.
 
 Write it as a Java text block named `KNOWLEDGE_PROMPT`, with the same line-continuation style as `SYSTEM_PROMPT`.
 

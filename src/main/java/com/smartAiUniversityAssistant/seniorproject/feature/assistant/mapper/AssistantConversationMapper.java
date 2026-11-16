@@ -65,7 +65,8 @@ public class AssistantConversationMapper {
 
     public static String preview(String answer) { return shorten(answer, PREVIEW_MAX_CHARS); }
 
-    private List<StudentAssistantChatResponse.Source> sources(String stored) {
+    /** The stored sources JSON of an answer; [] when it is empty or cannot be read. */
+    public List<StudentAssistantChatResponse.Source> sources(String stored) {
         if (stored == null || stored.isBlank()) return List.of();
         try {
             var sources = json.readValue(stored, SOURCES);

@@ -11,6 +11,7 @@ import com.smartAiUniversityAssistant.seniorproject.feature.assistant.service.Ac
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.service.AcademicAiToolExecutor;
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.service.AcademicAiToolRegistry;
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.service.AcademicReferenceResolver;
+import com.smartAiUniversityAssistant.seniorproject.feature.assistant.service.AssistantAnswerText;
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.service.AssistantKnowledgeSettings;
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.service.AssistantProgressSettings;
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.service.ConversationContextService;
@@ -77,6 +78,11 @@ public class StudentAssistantServiceImpl implements StudentAssistantService {
             Answer clearly and concisely, in the language the student writes in.
             You may explain general academic concepts such as credit hours, GPA, prerequisites, courses, course sections \
             and enrollment without using tools.
+            ANSWER STYLE
+            Reply the way a helpful person does in a chat: begin with the answer itself, in natural, friendly sentences, and \
+            keep it short. Do not open with phrases such as "According to" or "Based on the documents". Write plain text, \
+            not Markdown: no asterisks, no "#" headings, no backticks and no tables. When several items must be listed, put \
+            each on its own line: numbered when a rule below asks for numbers, otherwise starting with "- ".
             ACADEMIC FACT RULES
             1. For the student's personal or current academic information (profile, faculty, department, program, semester, \
             academic year, enrollments, courses, schedule, sections, rooms, lecturers, credits, prerequisites, capacity or seat \
@@ -137,9 +143,9 @@ public class StudentAssistantServiceImpl implements StudentAssistantService {
             absence or graduation requirements, call search_university_knowledge with a short, specific query. Do not answer \
             such questions from general knowledge or from what other universities do. Do not call it for greetings, small talk \
             or general concepts that are not specific to this university.
-            18. Answer only from the passages the tool returned in this request. Name the document that supports the answer, \
-            and its section or page when given. If the passages do not contain the answer, say that you could not find it in \
-            the university documents.
+            18. Answer only from the passages the tool returned in this request. Do not mention document titles, file names, \
+            page numbers or section names in the answer, unless a rule below asks you to name a document. If the passages do \
+            not contain the answer, say that you could not find it in the university documents.
             19. Copy numbers, amounts, dates, deadlines and conditions exactly as the passage states them. Do not calculate, \
             convert, round or combine them. Write a range in words ("9 to 22 credits"), not with a hyphen. If passages from \
             different documents or academic years disagree, say so and name each document with its academic year.
@@ -196,7 +202,7 @@ public class StudentAssistantServiceImpl implements StudentAssistantService {
             H1. Call search_university_knowledge for the requirement, for example "credits required to graduate" or "cooperative \
             education requirements". Answer only from the passages and the values below. You do not need to call \
             get_my_academic_progress again.
-            H2. Name the requirement with its document, then the student's value. When both are credit numbers, you may give the \
+            H2. State the requirement, then the student's value. When both are credit numbers, you may give the \
             difference in words in one sentence, for example "140 credits are required and you have earned 45, so at least 95 more \
             credits remain". Write "at least", because some earned credits may not count toward this curriculum. Never write a \
             calculation with a hyphen or a minus sign between two numbers.
@@ -432,7 +438,8 @@ public class StudentAssistantServiceImpl implements StudentAssistantService {
                         if (hybrid) logHybrid(requestId, evidence, "SEARCH_MISSING");
                         return new StudentAssistantChatResponse(fallback, requestId, saved, model, clock.instant());
                     }
-                    String answer = response.content().strip();
+                    // Markdown syntax is removed before the checks: the app shows the answer as plain text.
+                    String answer = AssistantAnswerText.plain(response.content());
                     String event = null;
                     String outcome = "-";
                     if (!evidence.isEmpty()) {

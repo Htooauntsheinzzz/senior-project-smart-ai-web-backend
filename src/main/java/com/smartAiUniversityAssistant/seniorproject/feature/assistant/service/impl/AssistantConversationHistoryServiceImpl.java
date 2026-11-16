@@ -8,6 +8,7 @@ import com.smartAiUniversityAssistant.seniorproject.feature.assistant.exception.
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.mapper.AssistantConversationMapper;
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.repository.AssistantConversationHistoryRepository;
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.repository.AssistantConversationRepository;
+import com.smartAiUniversityAssistant.seniorproject.feature.assistant.repository.AssistantMessageFeedbackRepository;
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.repository.AssistantMessageRepository;
 import com.smartAiUniversityAssistant.seniorproject.feature.assistant.service.AssistantConversationHistoryService;
 import com.smartAiUniversityAssistant.seniorproject.feature.studentacademic.service.StudentAcademicService;
@@ -40,10 +41,13 @@ public class AssistantConversationHistoryServiceImpl implements AssistantConvers
     private final AiAssistantHistoryProperties properties;
     private final CurrentStudentProvider currentStudent;
     private final StudentAcademicService academics;
+    private final AssistantMessageFeedbackRepository feedback;
 
     public AssistantConversationHistoryServiceImpl(AssistantConversationHistoryRepository conversations,
             AssistantMessageRepository messages, AssistantConversationRepository shortTerm, AssistantConversationMapper mapper,
-            AiAssistantHistoryProperties properties, CurrentStudentProvider currentStudent, StudentAcademicService academics) {
+            AiAssistantHistoryProperties properties, CurrentStudentProvider currentStudent, StudentAcademicService academics,
+            AssistantMessageFeedbackRepository feedback) {
+        this.feedback = feedback;
         this.conversations = conversations;
         this.messages = messages;
         this.shortTerm = shortTerm;
@@ -159,6 +163,8 @@ public class AssistantConversationHistoryServiceImpl implements AssistantConvers
             log.warn("ASSISTANT_CONTEXT_UNAVAILABLE operation=delete conversationId={} error={}", id, e.getClass().getSimpleName());
             throw AiAssistantFailure.contextUnavailable();
         }
+        // Spec file 59: the Student's ratings of this conversation's answers go with it (no cascade in this schema).
+        feedback.deleteByConversationId(id);
         int stored = messages.deleteByConversationId(id);
         conversations.delete(conversation);
         log.info("ASSISTANT_CONVERSATION_DELETED conversationId={} messages={}", id, stored);
