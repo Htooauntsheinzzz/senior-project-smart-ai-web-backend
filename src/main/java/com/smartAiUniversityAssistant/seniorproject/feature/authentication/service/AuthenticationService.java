@@ -7,6 +7,12 @@ public interface AuthenticationService {
 
     TokenResponse refresh(RefreshTokenRequest request);
 
+    /**
+     * Spec file 61: opens a session for a user whose identity was already proven without a password (Google sign-in).
+     * The account must be eligible exactly as for a password login (active, not deleted, not locked).
+     */
+    TokenResponse startSession(long userId);
+
     void logout(AuthenticatedUser principal);
 
     CurrentUserResponse me(AuthenticatedUser principal);

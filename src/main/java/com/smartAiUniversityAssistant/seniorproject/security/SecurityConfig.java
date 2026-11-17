@@ -35,6 +35,8 @@ public class SecurityConfig {
                         .jwt(j -> j.jwtAuthenticationConverter(converter)))
                 .authorizeHttpRequests(c -> c
                         .requestMatchers(HttpMethod.POST,"/api/v1/admin/auth/login","/api/v1/admin/auth/refresh").permitAll()
+                        // Spec file 61: Admin self-registration (form, email verification) and Google sign-in.
+                        .requestMatchers(HttpMethod.POST,ADMIN_REGISTRATION_PUBLIC).permitAll()
                         .requestMatchers(HttpMethod.POST,STUDENT_PUBLIC).permitAll()
                         .requestMatchers(HttpMethod.GET,"/actuator/health/liveness","/actuator/health/readiness").permitAll()
                         .requestMatchers(HttpMethod.GET,"/api/v1/admin/auth/me").access((auth,context) -> admin(auth.get()))
@@ -110,8 +112,11 @@ public class SecurityConfig {
         return http.build();
     }
     private static final String[] STUDENT_PUBLIC={"/api/v1/student/auth/register","/api/v1/student/auth/login","/api/v1/student/auth/refresh"};
+    private static final String[] ADMIN_REGISTRATION_PUBLIC={"/api/v1/admin/auth/register","/api/v1/admin/auth/verify-email",
+            "/api/v1/admin/auth/resend-verification","/api/v1/admin/auth/google"};
     private boolean isPublic(String method,String path) {
         return method.equals("POST") && (path.equals("/api/v1/admin/auth/login") || path.equals("/api/v1/admin/auth/refresh")
+                || java.util.Arrays.asList(ADMIN_REGISTRATION_PUBLIC).contains(path)
                 || java.util.Arrays.asList(STUDENT_PUBLIC).contains(path));
     }
     private static AuthorizationDecision hasAnyRole(org.springframework.security.core.Authentication auth,String... roles) {

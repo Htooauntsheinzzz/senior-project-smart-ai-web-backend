@@ -17,6 +17,11 @@ public class AuthenticationFailure extends RuntimeException {
     public static AuthenticationFailure validation() {
         return new AuthenticationFailure(400, "VALIDATION_ERROR", "The request is invalid.");
     }
+    /** Spec file 62: a self-registered account that a Super Admin has not approved yet. */
+    public static AuthenticationFailure pendingApproval() {
+        return new AuthenticationFailure(403, "ACCOUNT_PENDING_APPROVAL",
+                "Your registration is waiting for approval by an administrator.");
+    }
     public static AuthenticationFailure unauthorized() {
         return new AuthenticationFailure(401, "UNAUTHORIZED", "Authentication is required.");
     }

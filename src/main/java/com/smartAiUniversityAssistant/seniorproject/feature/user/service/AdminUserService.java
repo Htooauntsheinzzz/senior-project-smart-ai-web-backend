@@ -21,4 +21,10 @@ public interface AdminUserService {
     AdminUserDetailResponse updateRole(AuthenticatedUser actor, long id, UpdateAdminUserRoleRequest request);
 
     void delete(AuthenticatedUser actor, long id);
+
+    /** Spec file 62: activates a waiting registration and mails the person. */
+    AdminUserDetailResponse approveRegistration(AuthenticatedUser actor, long id);
+
+    /** Spec file 62: deletes a waiting registration and mails the person when the email was proven. */
+    void rejectRegistration(AuthenticatedUser actor, long id);
 }

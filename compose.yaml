@@ -65,11 +65,25 @@ services:
       start_period: 5s
     restart: unless-stopped
 
+  # Spec file 61: local mail catcher for registration mails. Nothing leaves the machine.
+  # SMTP on localhost:1025, inbox in the browser on http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      - "127.0.0.1:${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
+    restart: unless-stopped
+
   admin-web:
     build:
       context: ${FRONTEND_PATH:-../../frontend/senior-project-smart-ai-admin-panel}
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/}
+        # Spec file 61, section 15: the admin web draws the Google button with the same client ID
+        # and names the same email domain. None of these values is a secret.
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+        VITE_GOOGLE_HOSTED_DOMAIN: ${GOOGLE_OAUTH_HOSTED_DOMAIN:-}
+        VITE_ADMIN_EMAIL_DOMAIN: ${ADMIN_REGISTRATION_EMAIL_DOMAIN:-rsu.ac.th}
     volumes:
       - type: bind
         source: ./docker/admin-web.conf
@@ -107,6 +121,25 @@ services:
       AUTH_LOGIN_PER_IP: ${AUTH_LOGIN_PER_IP:-60}
       AUTH_LOGIN_PER_IDENTIFIER: ${AUTH_LOGIN_PER_IDENTIFIER:-10}
       AUTH_REFRESH_PER_IP: ${AUTH_REFRESH_PER_IP:-120}
+      ADMIN_REGISTRATION_ENABLED: ${ADMIN_REGISTRATION_ENABLED:-true}
+      ADMIN_REGISTRATION_EMAIL_DOMAIN: ${ADMIN_REGISTRATION_EMAIL_DOMAIN:-rsu.ac.th}
+      ADMIN_REGISTRATION_DEFAULT_ROLE: ${ADMIN_REGISTRATION_DEFAULT_ROLE:-ADMIN}
+      ADMIN_REGISTRATION_VERIFICATION_TTL: ${ADMIN_REGISTRATION_VERIFICATION_TTL:-24h}
+      ADMIN_REGISTRATION_VERIFICATION_URL: ${ADMIN_REGISTRATION_VERIFICATION_URL:-http://localhost:3000/verify-email}
+      ADMIN_REGISTRATION_LOGIN_URL: ${ADMIN_REGISTRATION_LOGIN_URL:-http://localhost:3000/login}
+      ADMIN_REGISTRATION_MAIL_PER_ADDRESS: ${ADMIN_REGISTRATION_MAIL_PER_ADDRESS:-3}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_HOSTED_DOMAIN: ${GOOGLE_OAUTH_HOSTED_DOMAIN:-}
+      # Mail goes to the mailpit service unless .env names a real SMTP server.
+      MAIL_ENABLED: ${MAIL_ENABLED:-true}
+      MAIL_HOST: ${MAIL_HOST:-mailpit}
+      MAIL_PORT: ${MAIL_PORT:-1025}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_SMTP_AUTH: ${MAIL_SMTP_AUTH:-false}
+      MAIL_SMTP_STARTTLS: ${MAIL_SMTP_STARTTLS:-false}
+      MAIL_FROM: ${MAIL_FROM:-no-reply@rsu.ac.th}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Smart AI University Assistant}
       AI_PROVIDER: ${AI_PROVIDER:-openai-compatible}
       AI_API_KEY: ${AI_API_KEY:-}
       AI_MODEL: ${AI_MODEL:-}

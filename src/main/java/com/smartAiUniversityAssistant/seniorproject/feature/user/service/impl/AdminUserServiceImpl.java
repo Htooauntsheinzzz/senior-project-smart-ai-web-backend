@@ -17,12 +17,14 @@ public class AdminUserServiceImpl implements AdminUserService {
     private final AdminAccountProvisioningService provisioning;
     private final AdminAccountManagementService management;
     private final AdminUserMapper mapper;
+    private final AdminMailService mail;
 
     public AdminUserServiceImpl(AdminAccountProvisioningService provisioning,
-            AdminAccountManagementService management, AdminUserMapper mapper) {
+            AdminAccountManagementService management, AdminUserMapper mapper, AdminMailService mail) {
         this.provisioning = provisioning;
         this.management = management;
         this.mapper = mapper;
+        this.mail = mail;
     }
 
     @Override
@@ -86,6 +88,28 @@ public class AdminUserServiceImpl implements AdminUserService {
         requireFullSession(actor);
         requirePositiveId(id);
         management.delete(actor, id);
+    }
+
+    // Spec file 62. No transaction here: the decision is committed first, then the mail is sent, so a mail server
+    // problem never undoes a decision and no row lock is held while a mail is sent.
+    @Override
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public AdminUserDetailResponse approveRegistration(AuthenticatedUser actor, long id) {
+        requireFullSession(actor);
+        requirePositiveId(id);
+        AdminAccountData approved = management.approveRegistration(actor, id);
+        mail.sendApproved(approved.email(), approved.firstName());
+        return mapper.detail(approved);
+    }
+
+    @Override
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public void rejectRegistration(AuthenticatedUser actor, long id) {
+        requireFullSession(actor);
+        requirePositiveId(id);
+        var rejected = management.rejectRegistration(actor, id);
+        // Nobody proved an unverified address, so no mail goes to it.
+        if (rejected.emailProven()) mail.sendRejected(rejected.email(), rejected.firstName());
     }
 
     private void requireFullSession(AuthenticatedUser actor) {

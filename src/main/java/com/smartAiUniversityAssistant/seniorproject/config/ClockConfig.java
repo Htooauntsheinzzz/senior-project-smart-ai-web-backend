@@ -13,7 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
         KnowledgeIngestionProperties.class, KnowledgeExtractionProperties.class, KnowledgeCleaningProperties.class,
         KnowledgeChunkingProperties.class, KnowledgeEmbeddingProperties.class, KnowledgeSearchProperties.class,
         AiAssistantKnowledgeProperties.class, AiAssistantProgressProperties.class,
-        AiAssistantHistoryProperties.class})
+        AiAssistantHistoryProperties.class, AdminRegistrationProperties.class, AppMailProperties.class})
 public class ClockConfig {
     @Bean public Clock authenticationClock() { return Clock.systemUTC(); }
     @Bean public PasswordEncoder passwordEncoder(AuthenticationProperties properties) {

@@ -54,7 +54,7 @@ class AdminAssistantHistoryAndFeedbackIntegrationTests extends IntegrationSuppor
 
     @BeforeEach
     void setUp() throws Exception {
-        clock.set(Instant.parse("2026-11-10T03:00:00Z"));
+        clock.set(Instant.parse("2054-11-10T03:00:00Z"));
         redis.execute((org.springframework.data.redis.core.RedisCallback<Void>) connection -> {
             connection.serverCommands().flushDb();
             return null;
@@ -124,9 +124,9 @@ class AdminAssistantHistoryAndFeedbackIntegrationTests extends IntegrationSuppor
         assertThat(ids(ok(get(CONVERSATIONS).param("search", "no such text")))).isEmpty();
 
         // Dates filter on the latest activity: from inclusive, to exclusive.
-        assertThat(ids(ok(get(CONVERSATIONS).param("from", "2026-11-11T00:00:00Z")))).containsExactly(third);
-        assertThat(ids(ok(get(CONVERSATIONS).param("to", "2026-11-10T04:00:00Z")))).containsExactly(first);
-        assertThat(ids(ok(get(CONVERSATIONS).param("from", "2026-11-10T04:00:00Z").param("to", "2026-11-11T00:00:00Z"))))
+        assertThat(ids(ok(get(CONVERSATIONS).param("from", "2054-11-11T00:00:00Z")))).containsExactly(third);
+        assertThat(ids(ok(get(CONVERSATIONS).param("to", "2054-11-10T04:00:00Z")))).containsExactly(first);
+        assertThat(ids(ok(get(CONVERSATIONS).param("from", "2054-11-10T04:00:00Z").param("to", "2054-11-11T00:00:00Z"))))
                 .containsExactly(second);
     }
 
@@ -180,10 +180,10 @@ class AdminAssistantHistoryAndFeedbackIntegrationTests extends IntegrationSuppor
     void historyValidationRolesAndExport() throws Exception {
         String id = talk(tokenA, null, "=SUM(A1) is this a formula?", "No, \"quoted\" text.");
         for (String[] bad : List.of(new String[] {"page", "-1"}, new String[] {"size", "0"}, new String[] {"size", "51"},
-                new String[] {"page", "x"}, new String[] {"from", "2026-11-10"}, new String[] {"to", "yesterday"},
+                new String[] {"page", "x"}, new String[] {"from", "2054-11-10"}, new String[] {"to", "yesterday"},
                 new String[] {"search", "x".repeat(101)}))
             error(perform(get(CONVERSATIONS).param(bad[0], bad[1]), admin), 400, "VALIDATION_ERROR");
-        error(perform(get(CONVERSATIONS).param("from", "2026-11-11T00:00:00Z").param("to", "2026-11-10T00:00:00Z"), admin),
+        error(perform(get(CONVERSATIONS).param("from", "2054-11-11T00:00:00Z").param("to", "2054-11-10T00:00:00Z"), admin),
                 400, "VALIDATION_ERROR");
         for (String[] bad : List.of(new String[] {"limit", "0"}, new String[] {"limit", "101"}, new String[] {"beforeMessageId", "0"}))
             error(perform(get(CONVERSATIONS + "/" + id).param(bad[0], bad[1]), admin), 400, "VALIDATION_ERROR");
@@ -297,7 +297,7 @@ class AdminAssistantHistoryAndFeedbackIntegrationTests extends IntegrationSuppor
         // The question is the Student's message this answer replied to, not the first one of the conversation.
         assertThat(row.get("question").stringValue()).isEqualTo("Can you suggest a study technique?");
         assertThat(row.get("answer").stringValue()).isEqualTo("Try spaced repetition.");
-        assertThat(row.get("submittedAt").stringValue()).isEqualTo("2026-11-10T05:00:00Z");
+        assertThat(row.get("submittedAt").stringValue()).isEqualTo("2054-11-10T05:00:00Z");
         // Long texts are previews in the list and complete in the detail.
         assertThat(page.get("content").get(2).get("answer").stringValue()).hasSize(301).endsWith("…");
         JsonNode detail = ok(get(FEEDBACK + "/" + positive));
@@ -318,7 +318,7 @@ class AdminAssistantHistoryAndFeedbackIntegrationTests extends IntegrationSuppor
         assertThat(feedbackIds(ok(get(FEEDBACK).param("search", "library")))).containsExactly(third);
         assertThat(feedbackIds(ok(get(FEEDBACK).param("search", "std-test-002")))).containsExactly(third);
         assertThat(feedbackIds(ok(get(FEEDBACK).param("search", "alice")))).containsExactly(negative, positive);
-        assertThat(feedbackIds(ok(get(FEEDBACK).param("from", "2026-11-10T04:00:00Z").param("to", "2026-11-11T00:00:00Z"))))
+        assertThat(feedbackIds(ok(get(FEEDBACK).param("from", "2054-11-10T04:00:00Z").param("to", "2054-11-11T00:00:00Z"))))
                 .containsExactly(negative);
 
         // Review: status, note, reviewer and time.
@@ -329,7 +329,7 @@ class AdminAssistantHistoryAndFeedbackIntegrationTests extends IntegrationSuppor
         assertThat(reviewed.get("reviewNote").stringValue()).isEqualTo("Handbook needs an update");
         assertThat(reviewed.get("reviewedBy").get("id").asLong()).isEqualTo(adminId);
         assertThat(reviewed.get("reviewedBy").get("displayName").stringValue()).isEqualTo("Review Admin");
-        assertThat(reviewed.get("reviewedAt").stringValue()).isEqualTo("2026-11-11T06:00:00Z");
+        assertThat(reviewed.get("reviewedAt").stringValue()).isEqualTo("2054-11-11T06:00:00Z");
         assertThat(reviewed.get("question").stringValue()).isEqualTo("Can you suggest a study technique?");
         ok(patch(FEEDBACK + "/" + third + "/review"), Map.of("reviewStatus", "RESOLVED"));
         assertThat(feedbackIds(ok(get(FEEDBACK).param("reviewStatus", "PENDING")))).containsExactly(positive);
@@ -361,7 +361,7 @@ class AdminAssistantHistoryAndFeedbackIntegrationTests extends IntegrationSuppor
         assertThat(lines).hasSize(3);
         assertThat(lines[0]).startsWith("﻿\"No.\",\"Student Code\",\"Student Name\",\"Question\",\"AI Response\",\"Rating\",\"Comment\"");
         assertThat(lines[2]).startsWith("\"2\",\"STD-TEST-001\",\"Alice Anders\",\"Can you suggest a study technique?\","
-                + "\"Try spaced repetition.\",\"NEGATIVE\",\"The handbook says 1,000 baht\",\"2026-11-10T05:00:00Z\",\"REVIEWED\","
+                + "\"Try spaced repetition.\",\"NEGATIVE\",\"The handbook says 1,000 baht\",\"2054-11-10T05:00:00Z\",\"REVIEWED\","
                 + "\"Handbook needs an update\",\"Review Admin\"");
     }
 

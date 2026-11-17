@@ -12,7 +12,10 @@ public record AdminUserListQuery(String page, String size, String search, String
             "roleId", "departmentId", "departmentUnassigned", "sort");
     private static final Set<String> SORT_FIELDS = Set.of("id", "employeeId", "firstName", "lastName",
             "email", "accountStatus", "createdAt", "updatedAt");
-    private static final Set<String> STATUSES = Set.of("ACTIVE", "INACTIVE", "LOCKED", "SUSPENDED");
+    // PENDING_VERIFICATION (spec file 61) and PENDING_APPROVAL (spec file 62) can be listed, but a Super Admin
+    // cannot set them.
+    private static final Set<String> STATUSES = Set.of("ACTIVE", "INACTIVE", "LOCKED", "SUSPENDED",
+            "PENDING_VERIFICATION", "PENDING_APPROVAL");
 
     public static AdminUserListQuery from(HttpServletRequest request) {
         Set<String> unknown = new LinkedHashSet<>();

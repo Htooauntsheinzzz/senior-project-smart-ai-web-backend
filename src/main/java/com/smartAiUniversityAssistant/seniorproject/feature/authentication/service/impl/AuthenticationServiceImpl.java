@@ -34,9 +34,18 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         // No surrounding transaction: the separately proxied verifier commits failure counters before rejection.
         var result=credentials.verify(request.email(),request.password());
         metrics.counter("auth.login.outcomes","outcome",result.accepted()?"matched":"rejected").increment();
+        if (result.pendingApproval()) throw AuthenticationFailure.pendingApproval();
         if (!result.accepted()) throw AuthenticationFailure.credentials();
         var account=accounts.read(result.userId()).filter(a -> a.eligible() && a.credentialRevision().equals(result.revision()))
                 .orElseThrow(AuthenticationFailure::credentials);
+        return open(account);
+    }
+    @Override public TokenResponse startSession(long userId) {
+        var account=accounts.read(userId).filter(AccountSecuritySnapshot::eligible)
+                .orElseThrow(() -> new AuthenticationFailure(403,"ACCOUNT_NOT_ACTIVE","This account cannot sign in."));
+        return open(account);
+    }
+    private TokenResponse open(AccountSecuritySnapshot account) {
         for (int attempt=0;attempt<3;attempt++) {
             var prepared=sessions.prepare(account);
             var jwt=tokens.issue(account,prepared.session().sessionId(),prepared.session().mode(),prepared.session().absoluteExpiresAt());

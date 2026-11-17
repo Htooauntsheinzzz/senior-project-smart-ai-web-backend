@@ -40,7 +40,7 @@ class StudentEnrollmentIntegrationTests extends IntegrationSupport {
 
     @BeforeEach
     void fixture() {
-        clock.set(Instant.parse("2026-11-10T04:00:00Z"));
+        clock.set(Instant.parse("2054-11-10T04:00:00Z"));
         SecurityContextHolder.clearContext();
         redis.execute((org.springframework.data.redis.core.RedisCallback<Void>) connection -> {
             connection.serverCommands().flushDb();
@@ -104,7 +104,7 @@ class StudentEnrollmentIntegrationTests extends IntegrationSupport {
         String token = login("6600001");
         var created = tree(enroll(token, sectionA1).andExpect(status().isCreated()).andReturn());
         assertThat(created.get("enrollmentStatus").asText()).isEqualTo("PENDING");
-        assertThat(created.get("enrollmentDate").asText()).isEqualTo("2026-11-10");
+        assertThat(created.get("enrollmentDate").asText()).isEqualTo("2054-11-10");
         assertThat(created.get("courseSectionId").asLong()).isEqualTo(sectionA1);
         assertThat(created.get("description").asText()).isEqualTo("CS301 description");
         var row = db.queryForMap("SELECT student_id,status,created_by FROM enrollments WHERE id=?", created.get("enrollmentId").asLong());
@@ -167,11 +167,11 @@ class StudentEnrollmentIntegrationTests extends IntegrationSupport {
         String a = login("6600001");
         long active = id("""
                 INSERT INTO enrollments(student_id,course_section_id,enrollment_date,status,created_by)
-                VALUES (?,?,DATE '2026-08-15','ACTIVE',?) RETURNING id
+                VALUES (?,?,DATE '2054-08-15','ACTIVE',?) RETURNING id
                 """, studentA, sectionA1, actorId);
         long dropped = id("""
                 INSERT INTO enrollments(student_id,course_section_id,enrollment_date,status,created_by)
-                VALUES (?,?,DATE '2026-08-15','DROPPED',?) RETURNING id
+                VALUES (?,?,DATE '2054-08-15','DROPPED',?) RETURNING id
                 """, studentA, sectionB1, actorId);
         var rows = tree(get(a, "/available-sections").andReturn());
         assertThat(rows.get(2).get("blockedReason").asText()).isEqualTo("DROPPED_BY_UNIVERSITY");
@@ -257,10 +257,11 @@ class StudentEnrollmentIntegrationTests extends IntegrationSupport {
     @Test
     void enrollmentClosesAfterTheDueDate() throws Exception {
         String a = login("6600001");
-        // Today is 2026-11-10 in Bangkok. The due date itself is still open.
-        db.update("UPDATE course_section_meetings SET effective_from=DATE '2026-11-20',enrollment_due_date=DATE '2026-11-10' WHERE course_section_id=?", sectionA1);
+        // Today is 2054-11-10 in Bangkok. The due date itself is still open.
+        // The shared meeting fixture ends on 2026-12-25; the meeting must still end after it starts (D88).
+        db.update("UPDATE course_section_meetings SET effective_from=DATE '2054-11-20',effective_to=DATE '2054-12-25',enrollment_due_date=DATE '2054-11-10' WHERE course_section_id=?", sectionA1);
         JsonNode open = tree(get(a, "/available-sections").andReturn()).get(0);
-        assertThat(open.get("enrollmentDueDate").asText()).isEqualTo("2026-11-10");
+        assertThat(open.get("enrollmentDueDate").asText()).isEqualTo("2054-11-10");
         assertThat(open.get("enrollmentClosed").asBoolean()).isFalse();
         assertThat(open.get("canEnroll").asBoolean()).isTrue();
         // A section without a due date has no deadline.
@@ -268,7 +269,7 @@ class StudentEnrollmentIntegrationTests extends IntegrationSupport {
         long pending = tree(enroll(a, sectionA1).andExpect(status().isCreated()).andReturn()).get("enrollmentId").asLong();
         withdraw(a, pending).andExpect(status().isOk());
 
-        db.update("UPDATE course_section_meetings SET enrollment_due_date=DATE '2026-11-09' WHERE course_section_id=?", sectionA1);
+        db.update("UPDATE course_section_meetings SET enrollment_due_date=DATE '2054-11-09' WHERE course_section_id=?", sectionA1);
         JsonNode closed = tree(get(a, "/available-sections").andReturn()).get(0);
         assertThat(closed.get("enrollmentClosed").asBoolean()).isTrue();
         assertThat(closed.get("canEnroll").asBoolean()).isFalse();
@@ -276,11 +277,11 @@ class StudentEnrollmentIntegrationTests extends IntegrationSupport {
         enroll(a, sectionA1).andExpect(status().isConflict()).andExpect(jsonPath("code").value("ENROLLMENT_DUE_DATE_PASSED"));
         assertThat(db.queryForObject("SELECT status FROM enrollments WHERE id=?", String.class, pending)).isEqualTo("WITHDRAWN");
         // The earliest due date of the section's published meetings decides.
-        db.update("UPDATE course_section_meetings SET enrollment_due_date=DATE '2026-11-15' WHERE course_section_id=?", sectionA1);
+        db.update("UPDATE course_section_meetings SET enrollment_due_date=DATE '2054-11-15' WHERE course_section_id=?", sectionA1);
         db.update("""
                 INSERT INTO course_section_meetings(course_section_id,meeting_type,day_of_week,start_time,end_time,effective_from,effective_to,
                     room_id,status,is_active,enrollment_due_date)
-                SELECT course_section_id,'LAB',4,start_time,end_time,effective_from,effective_to,room_id,'PUBLISHED',TRUE,DATE '2026-11-08'
+                SELECT course_section_id,'LAB',4,start_time,end_time,effective_from,effective_to,room_id,'PUBLISHED',TRUE,DATE '2054-11-08'
                 FROM course_section_meetings WHERE course_section_id=?
                 """, sectionA1);
         enroll(a, sectionA1).andExpect(status().isConflict()).andExpect(jsonPath("code").value("ENROLLMENT_DUE_DATE_PASSED"));

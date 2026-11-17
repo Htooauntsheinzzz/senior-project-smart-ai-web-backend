@@ -184,7 +184,9 @@ Authentication settings are environment-driven. `.env.example` contains local
 defaults for issuer, audience, key ID, token/session lifetimes, BCrypt cost,
 lockout, CORS, timeouts, Redis namespace, and abuse limits. Use a distinct
 `AUTH_REDIS_KEY_PREFIX` per environment. Login trims only surrounding email
-whitespace and remains case-sensitive; passwords are never trimmed or normalized.
+whitespace and looks the email up as typed; when nothing matches it tries the
+lower-case form once, because self-registered accounts store lower-case emails.
+Passwords are never trimmed or normalized.
 
 Access tokens last at most 15 minutes. Refresh sessions have a fixed seven-day
 absolute lifetime, or ten minutes when password change is required. Clients must
@@ -296,6 +298,82 @@ All routes below require a full-session Super Admin Bearer token and return
   (decision D18), so these operations rely on per-request database rechecks
   instead of bulk session revocation. A reactivated user's old sessions may work
   again until they expire.
+
+## Admin self-registration, Google sign-in and mail
+
+Spec files 60, 61 and 62. A person with an `@rsu.ac.th` email address
+(`ADMIN_REGISTRATION_EMAIL_DOMAIN`) can register for an Admin web account in two
+ways. Because staff and students share that domain, the account cannot sign in
+until a Super Admin approves it (spec file 62): after the email is proven it is
+`PENDING_APPROVAL`, and the person gets the mail "Your registration is waiting
+for approval". The new account gets the role `ADMIN_REGISTRATION_DEFAULT_ROLE`
+(`ADMIN` by default, never `SUPER_ADMIN`); a Super Admin can change it with
+`PUT /api/v1/admin/users/{id}` before or after approving.
+Set `ADMIN_REGISTRATION_ENABLED=false` to stop new registrations.
+
+All four routes are public, rate limited per IP address, and answer with
+`Cache-Control: no-store`:
+
+| Route | Purpose |
+| --- | --- |
+| `POST /api/v1/admin/auth/register` | Registration form. Creates the account as `PENDING_VERIFICATION` and mails a verification link. Always `202` with the same text, whether or not the address already has an account. |
+| `POST /api/v1/admin/auth/verify-email` | Body `{"token":"..."}` from the link. The account becomes `PENDING_APPROVAL` and gets the waiting mail. |
+| `POST /api/v1/admin/auth/resend-verification` | Body `{"email":"..."}`. Mails a new link; the old one stops working. |
+| `POST /api/v1/admin/auth/google` | Body `{"idToken":"..."}` from the Google sign-in button. Returns the same tokens as `/login` for an approved account. The first sign-in creates a `PENDING_APPROVAL` account, mails the waiting mail and answers `403 ACCOUNT_PENDING_APPROVAL`. |
+
+```bash
+curl -i http://localhost:8080/api/v1/admin/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"firstName":"Somchai","lastName":"Jaidee","email":"somchai.j@rsu.ac.th","password":"a long passphrase for rsu","confirmPassword":"a long passphrase for rsu"}'
+```
+
+The verification link is `ADMIN_REGISTRATION_VERIFICATION_URL?token=<token>`; the
+admin web page behind it posts the token to `/verify-email`. A link works once and
+for `ADMIN_REGISTRATION_VERIFICATION_TTL` (24 hours). An account that is not
+verified cannot log in (`401 INVALID_CREDENTIALS`, as for any other failed login).
+A `PENDING_APPROVAL` account with the right password gets
+`403 ACCOUNT_PENDING_APPROVAL`; a wrong password still gets `401`.
+
+The Super Admin decides under `/api/v1/admin/users` (Super Admin only):
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/v1/admin/users?accountStatus=PENDING_APPROVAL` | The waiting registrations. |
+| `POST /api/v1/admin/users/{id}/approve` | `PENDING_APPROVAL` → `ACTIVE`, `200` with the user detail, mail "Your account is approved". |
+| `POST /api/v1/admin/users/{id}/reject` | A `PENDING_APPROVAL` or `PENDING_VERIFICATION` account is deleted (like `DELETE`), `204`; mail "Your registration was not approved" when the email was proven. The address cannot register again. |
+
+Both answer `409 REGISTRATION_NOT_PENDING` for an account that is not waiting
+and `404 USER_NOT_FOUND` for an unknown or deleted one. `PATCH /{id}/status` and
+`PUT /{id}` cannot move an account out of a pending status
+(`409 REGISTRATION_DECISION_REQUIRED`).
+
+Google sign-in needs `GOOGLE_OAUTH_CLIENT_ID` (an OAuth 2.0 **Web** client ID from
+Google Cloud Console; it is not a secret). The backend checks the ID token's
+signature against Google's keys, its issuer, that it was issued for this client
+ID, its expiry, `email_verified`, the email domain, and that the account belongs
+to the university's Google Workspace (the `hd` claim, as Google's guide requires
+for a sign-in limited to one domain). A personal Google account that only uses an
+`@rsu.ac.th` address is refused with `403 GOOGLE_ACCOUNT_NOT_IN_DOMAIN`; that
+person can use the registration form. `GOOGLE_OAUTH_HOSTED_DOMAIN` is needed only
+when the Workspace reports another main domain than the email domain. No client
+secret and no redirect URI are used. Without the client ID the route answers
+`503 GOOGLE_SIGN_IN_NOT_CONFIGURED`.
+
+The admin web draws the Google button with the same client ID. `compose.yaml`
+passes `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_HOSTED_DOMAIN` and
+`ADMIN_REGISTRATION_EMAIL_DOMAIN` to the `admin-web` image build, so after a
+change run `docker compose up -d --build admin-web backend`. In Google Cloud the
+client ID needs the address of the admin web under **Authorized JavaScript
+origins** (for local work both `http://localhost` and `http://localhost:3000`).
+
+Mail is plain text over SMTP (`MAIL_*` in `.env.example`). Without any mail
+settings, `docker compose up -d` sends every mail to the local **Mailpit** service:
+open <http://localhost:8025> to read it. Nothing leaves the machine. For real
+mail, set `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`,
+`MAIL_SMTP_AUTH=true`, `MAIL_SMTP_STARTTLS=true` and `MAIL_FROM` in `.env`. A mail
+that cannot be sent never fails the request; it is logged as
+`ADMIN_MAIL_SEND_FAILED` without the address, and the person can ask for a new
+link.
 
 ## Manage faculties
 

@@ -20,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdminAccountManagementServiceImpl implements AdminAccountManagementService {
     private static final Set<String> SUPPORTED_ROLES = Set.of("SUPER_ADMIN", "ADMIN", "ACADEMIC_ADMIN");
     private static final Set<String> STATUSES = Set.of("ACTIVE", "INACTIVE", "LOCKED", "SUSPENDED");
+    /** Spec file 62: set by the system only; a Super Admin leaves them with approve or reject. */
+    private static final Set<String> REGISTRATION_STATUSES = Set.of(AppUser.PENDING_VERIFICATION, AppUser.PENDING_APPROVAL);
     private final AppUserRepository users;
     private final AppRoleRepository roles;
     private final AppUserRoleRepository userRoles;
@@ -28,11 +30,12 @@ public class AdminAccountManagementServiceImpl implements AdminAccountManagement
     private final PasswordPolicy passwordPolicy;
     private final Clock clock;
     private final DepartmentAssignmentService departmentAssignments;
+    private final AppUserEmailVerificationRepository verifications;
 
     public AdminAccountManagementServiceImpl(AppUserRepository users, AppRoleRepository roles,
             AppUserRoleRepository userRoles, AppUserCredentialsRepository credentials,
             CredentialPolicy credentialPolicy, PasswordPolicy passwordPolicy, Clock clock,
-            DepartmentAssignmentService departmentAssignments) {
+            DepartmentAssignmentService departmentAssignments, AppUserEmailVerificationRepository verifications) {
         this.users = users;
         this.roles = roles;
         this.userRoles = userRoles;
@@ -41,6 +44,7 @@ public class AdminAccountManagementServiceImpl implements AdminAccountManagement
         this.passwordPolicy = passwordPolicy;
         this.clock = clock;
         this.departmentAssignments = departmentAssignments;
+        this.verifications = verifications;
     }
 
     @Override
@@ -68,8 +72,11 @@ public class AdminAccountManagementServiceImpl implements AdminAccountManagement
         validateActor(actor, clock.instant());
         AppUser target = lockNonDeletedTarget(targetId);
         AppRole role = lockSupportedRole(command.roleId());
-        if (!STATUSES.contains(command.accountStatus()))
+        boolean keepsRegistrationStatus = REGISTRATION_STATUSES.contains(command.accountStatus())
+                && command.accountStatus().equals(target.getAccountStatus());
+        if (!STATUSES.contains(command.accountStatus()) && !keepsRegistrationStatus)
             throw failure(400, "VALIDATION_ERROR", "The request is invalid.");
+        requireNoRegistrationDecision(target, command.accountStatus());
         boolean emailExists = users.existsByEmailAndIdNot(command.email(), targetId);
         boolean employeeExists = users.existsByEmployeeIdAndIdNot(command.employeeId(), targetId);
         if (emailExists && employeeExists)
@@ -111,6 +118,7 @@ public class AdminAccountManagementServiceImpl implements AdminAccountManagement
         validateActor(actor, clock.instant());
         if (!STATUSES.contains(accountStatus)) throw failure(400, "VALIDATION_ERROR", "The request is invalid.");
         AppUser target = lockNonDeletedTarget(targetId);
+        requireNoRegistrationDecision(target, accountStatus);
         if (!target.getAccountStatus().equals(accountStatus)) {
             if (actor.userId() == targetId) throw selfChange();
             target.setAccountStatus(accountStatus);
@@ -148,6 +156,45 @@ public class AdminAccountManagementServiceImpl implements AdminAccountManagement
         target.setDeleted(true);
         audit(target, actor.userId(), now);
         users.flush();
+    }
+
+    @Override
+    @Transactional(timeout = 15)
+    public AdminAccountData approveRegistration(AuthenticatedUser actor, long targetId) {
+        LocalDateTime now = utcNow();
+        validateActor(actor, clock.instant());
+        AppUser target = lockNonDeletedTarget(targetId);
+        if (!AppUser.PENDING_APPROVAL.equals(target.getAccountStatus())) throw registrationNotPending();
+        target.setAccountStatus(AppUser.ACTIVE);
+        audit(target, actor.userId(), now);
+        users.flush();
+        return data(target, mapAssignments(userRoles.findByUserId(targetId)));
+    }
+
+    @Override
+    @Transactional(timeout = 15)
+    public RegistrationContact rejectRegistration(AuthenticatedUser actor, long targetId) {
+        LocalDateTime now = utcNow();
+        validateActor(actor, clock.instant());
+        AppUser target = lockNonDeletedTarget(targetId);
+        if (!REGISTRATION_STATUSES.contains(target.getAccountStatus())) throw registrationNotPending();
+        verifications.findByUserId(targetId).ifPresent(verifications::delete);
+        target.setDeleted(true);
+        audit(target, actor.userId(), now);
+        users.flush();
+        return new RegistrationContact(target.getEmail(), target.getFirstName(),
+                AppUser.PENDING_APPROVAL.equals(target.getAccountStatus()));
+    }
+
+    /** Spec file 62: an account that waits for its email or for approval leaves that status only by approve or reject. */
+    private void requireNoRegistrationDecision(AppUser target, String requestedStatus) {
+        if (REGISTRATION_STATUSES.contains(target.getAccountStatus())
+                && !target.getAccountStatus().equals(requestedStatus))
+            throw failure(409, "REGISTRATION_DECISION_REQUIRED", "Approve or reject this registration first.");
+    }
+
+    private AdminAccountManagementFailure registrationNotPending() {
+        return failure(409, "REGISTRATION_NOT_PENDING", "This account is not waiting for approval.");
     }
 
     private void validateActor(AuthenticatedUser actor, Instant instant) {
@@ -199,7 +246,8 @@ public class AdminAccountManagementServiceImpl implements AdminAccountManagement
     }
 
     private boolean profileChanged(AppUser target, UpdateAdminAccountCommand command) {
-        return !target.getEmployeeId().equals(command.employeeId())
+        // A self-registered user has no employee ID until a Super Admin enters it (spec file 60).
+        return !Objects.equals(target.getEmployeeId(), command.employeeId())
                 || !target.getFirstName().equals(command.firstName())
                 || !target.getLastName().equals(command.lastName())
                 || !target.getEmail().equals(command.email())

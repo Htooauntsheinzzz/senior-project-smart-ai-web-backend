@@ -18,6 +18,14 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long>, JpaSpec
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from AppUser u where u.email = :email")
     Optional<AppUser> findByEmailForUpdate(@Param("email") String email);
+    /**
+     * Spec file 61: every user whose email equals the given lower-case email when case is ignored, locked. The email
+     * column is unique only case-sensitively, so older data may hold more than one.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "5000"))
+    @Query("select u from AppUser u where lower(u.email) = :email order by u.id")
+    java.util.List<AppUser> findAllByEmailIgnoreCaseForUpdate(@Param("email") String email);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "5000"))
     @Query("select u from AppUser u where u.id = :id")

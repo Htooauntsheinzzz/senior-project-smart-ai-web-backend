@@ -58,6 +58,19 @@ public class AdminUserController {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(users.updateRole(actor, id, request));
     }
 
+    // Spec file 62: the decision about a self-registration.
+    @PostMapping("/{id}/approve")
+    public ResponseEntity<AdminUserDetailResponse> approve(@AuthenticationPrincipal AuthenticatedUser actor,
+            @PathVariable Long id) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(users.approveRegistration(actor, id));
+    }
+
+    @PostMapping("/{id}/reject")
+    public ResponseEntity<Void> reject(@AuthenticationPrincipal AuthenticatedUser actor, @PathVariable Long id) {
+        users.rejectRegistration(actor, id);
+        return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@AuthenticationPrincipal AuthenticatedUser actor, @PathVariable Long id) {
         users.delete(actor, id);

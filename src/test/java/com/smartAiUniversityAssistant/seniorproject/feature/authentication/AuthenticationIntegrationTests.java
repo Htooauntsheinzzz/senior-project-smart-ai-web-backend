@@ -392,7 +392,7 @@ class AuthenticationIntegrationTests extends IntegrationSupport {
                 .isEqualTo("create academic document processing");
         assertThat(db.queryForObject("SELECT is_nullable FROM information_schema.columns WHERE table_name='semesters' AND column_name='academic_year'",String.class))
                 .isEqualTo("NO");
-        assertThat(db.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_schema='public'",Integer.class)).isEqualTo(48);  // Step 17 added assistant_conversations and assistant_messages; spec file 59 assistant_message_feedback
-        assertThat(db.queryForObject("SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('app_roles','app_users','app_user_roles','appuser_credentials')",Integer.class)).isEqualTo(34);
+        assertThat(db.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_schema='public'",Integer.class)).isEqualTo(50);  // Step 17 added assistant_conversations and assistant_messages; spec file 59 assistant_message_feedback; spec file 60 app_user_external_identities and app_user_email_verifications
+        assertThat(db.queryForObject("SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('app_roles','app_users','app_user_roles','appuser_credentials')",Integer.class)).isEqualTo(36);  // spec file 60 added app_users.registration_source and email_verified_at
     }
 }

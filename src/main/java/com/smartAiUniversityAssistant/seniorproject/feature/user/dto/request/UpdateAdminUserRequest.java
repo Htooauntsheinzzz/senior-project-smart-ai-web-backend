@@ -13,7 +13,9 @@ public final class UpdateAdminUserRequest {
     @NotBlank @Size(max = 100) private String lastName;
     @NotBlank @Size(max = 255) @Email private String email;
     @Positive private Long departmentId;
-    @NotNull @Pattern(regexp = "ACTIVE|INACTIVE|LOCKED|SUSPENDED") private String accountStatus;
+    // Spec file 62: a waiting registration keeps its PENDING_* status unchanged; the service refuses any other use.
+    @NotNull @Pattern(regexp = "ACTIVE|INACTIVE|LOCKED|SUSPENDED|PENDING_VERIFICATION|PENDING_APPROVAL")
+    private String accountStatus;
     @NotNull @Positive private Long roleId;
     private final Set<String> presentKeys = new HashSet<>();
 

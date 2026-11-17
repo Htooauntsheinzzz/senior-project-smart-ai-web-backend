@@ -26,20 +26,25 @@ public class AuthenticationRequestFilter extends OncePerRequestFilter {
         boolean studentsPath=path.equals("/api/v1/admin/students") || path.startsWith("/api/v1/admin/students/");
         boolean studentAuthPath=path.startsWith("/api/v1/student/");
         boolean createUser=path.equals("/api/v1/admin/users") && request.getMethod().equals("POST");
+        // Spec file 61: the public Admin self-registration and Google sign-in endpoints.
+        boolean adminRegistration=request.getMethod().equals("POST") && (path.equals("/api/v1/admin/auth/register")
+                || path.equals("/api/v1/admin/auth/verify-email") || path.equals("/api/v1/admin/auth/resend-verification")
+                || path.equals("/api/v1/admin/auth/google"));
         boolean mutationMethod=request.getMethod().equals("POST") || request.getMethod().equals("PUT") || request.getMethod().equals("PATCH");
         boolean adminMutation=(usersPath || facultiesPath || departmentsPath || programsPath || semestersPath || studentsPath || studentAuthPath) && mutationMethod;
         long start=System.nanoTime();
         try {
             if (authPath || usersPath || facultiesPath || departmentsPath || programsPath || semestersPath || studentsPath || studentAuthPath) response.setHeader("Cache-Control","no-store");
-            if (request.getMethod().equals("POST") && (path.equals("/api/v1/admin/auth/login") || path.equals("/api/v1/admin/auth/refresh") || path.equals("/api/v1/admin/auth/change-password")) || adminMutation) {
+            if (request.getMethod().equals("POST") && (path.equals("/api/v1/admin/auth/login") || path.equals("/api/v1/admin/auth/refresh") || path.equals("/api/v1/admin/auth/change-password")) || adminRegistration || adminMutation) {
                 if (path.equals("/api/v1/admin/auth/login")) throttle.check("login-ip",request.getRemoteAddr(),properties.throttle().loginPerIp());
                 if (path.equals("/api/v1/admin/auth/refresh")) throttle.check("refresh-ip",request.getRemoteAddr(),properties.throttle().refreshPerIp());
                 if (createUser) throttle.check("provision-ip",request.getRemoteAddr(),properties.throttle().loginPerIp());
+                if (adminRegistration) throttle.check("admin-registration-ip:"+path.substring(path.lastIndexOf('/')+1),request.getRemoteAddr(),properties.throttle().loginPerIp());
                 if (path.equals("/api/v1/student/auth/login")) throttle.check("student-login-ip",request.getRemoteAddr(),properties.throttle().loginPerIp());
                 if (path.equals("/api/v1/student/auth/register")) throttle.check("student-register-ip",request.getRemoteAddr(),properties.throttle().loginPerIp());
                 if (path.equals("/api/v1/student/auth/refresh")) throttle.check("student-refresh-ip",request.getRemoteAddr(),properties.throttle().refreshPerIp());
                 byte[] bytes=request.getInputStream().readNBytes(16385);
-                if ((usersPath || facultiesPath || departmentsPath || programsPath || semestersPath || studentsPath || studentAuthPath) && bytes.length>16384) throw new AuthenticationFailure(413,"CONTENT_TOO_LARGE","The request body is too large.");
+                if ((usersPath || facultiesPath || departmentsPath || programsPath || semestersPath || studentsPath || studentAuthPath || adminRegistration) && bytes.length>16384) throw new AuthenticationFailure(413,"CONTENT_TOO_LARGE","The request body is too large.");
                 var input=new ByteArrayInputStream(bytes);
                 request=new HttpServletRequestWrapper(request) {
                     @Override public ServletInputStream getInputStream() {

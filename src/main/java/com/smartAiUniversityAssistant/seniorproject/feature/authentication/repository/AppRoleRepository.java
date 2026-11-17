@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
 public interface AppRoleRepository extends JpaRepository<AppRole, Long> {
+    Optional<AppRole> findByRoleCode(String roleCode);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "5000"))
     @Query("select r from AppRole r where r.id = :id")
